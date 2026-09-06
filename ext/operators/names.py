@@ -47,6 +47,27 @@ class Labels(Enum):
     # ( Hide the left-bottom color bar )
     HIDE_COLOR_BAR           = "thermal.hide_color_bar"
 
+    # ------------- Names inside "thermal" (operation stack family) ---------------
+    # |
+    # ( Appends an entry of a given OpType to the scene's operation stack. )
+    OP_STACK_ADD             = "thermal.op_stack_add"
+    # ( Deletes the entry at a given index. )
+    OP_STACK_REMOVE          = "thermal.op_stack_remove"
+    # ( Shifts the entry at a given index up or down by one position. )
+    OP_STACK_MOVE            = "thermal.op_stack_move"
+    # ( Inserts a copy of the entry at a given index just below it. )
+    OP_STACK_DUPLICATE       = "thermal.op_stack_duplicate"
+    # ( Expands one entry and collapses the rest. Used by the per-object
+    #   shortcut to point at an operation in the scene stack. )
+    OP_STACK_ISOLATE         = "thermal.op_stack_isolate"
+    # ( Appends an empty object slot to one operation scope. )
+    OP_SCOPE_OBJECT_ADD      = "thermal.op_scope_object_add"
+    # ( Deletes one object slot from one operation scope. )
+    OP_SCOPE_OBJECT_REMOVE   = "thermal.op_scope_object_remove"
+    # ( Menu listing every registered operation, grouped by category. )
+    ADD_OPERATION_MENU_      = "THERMAL_MT_add_operation"
+
+
     # ------------- Names inside "thermal" (environment family) ---------------
     # |
     # ( Appends a new entry to the scene's environmental-factor stack )
