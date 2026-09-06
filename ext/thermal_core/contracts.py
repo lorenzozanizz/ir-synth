@@ -48,6 +48,48 @@ class EnvironmentSpecType(Enum):
     AMBIENT_TEMPERATURE = "Ambient Temperature"
     HUMIDITY = "Humidity"
 
+class ScopeMode(Enum):
+    """ How a field operation picks the objects it acts on. """
+
+    # Every object present in the bake.
+    ALL = "All Objects"
+    # Every object belonging to a named collection. The preferred way to name
+    # a set: it survives renames of its members and a hook can populate it.
+    COLLECTION = "Collection"
+    # An explicit list of object keys. Needed because the per-object "add an
+    # operation for this object" shortcut has to scope to exactly one object
+    # without inventing a collection for it.
+    OBJECTS = "Objects"
+
+
+class OpType(Enum):
+    """ A transformation applied to the temperature field after every source
+    strategy has been evaluated.
+
+    Orthogonal to InitType: an InitType creates a field out of nothing, an
+    OpType takes a field and returns a different one.
+    """
+
+    # Constrain every value into [min_k, max_k].
+    CLAMP = "Clamp"
+    # Average each vertex toward its neighbours.
+    SMOOTH = "Smooth"
+    # Warm receivers according to their proximity to sources.
+    CONTACT_DIFFUSION = "Contact Diffusion"
+
+
+class OpStage(Enum):
+    """ How much of the scene an operation needs to see.
+
+    PER_OBJECT operations are a formula over one object's field and geometry;
+    the registry resolves their scope and loops for them. SCENE operations
+    read and write across objects and resolve their own scopes, because some
+    of them (contact diffusion) have more than one.
+    """
+
+    PER_OBJECT = "Per Object"
+    SCENE = "Scene"
+
 
 class ObjectTempEvolution(Enum):
     """

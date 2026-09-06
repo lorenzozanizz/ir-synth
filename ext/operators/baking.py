@@ -23,9 +23,9 @@ from .names import Labels
 from ..constants import (
     TEMPERATURE_ATTR_NAME, TEMPERATURE_ATTR_TYPE, TEMPERATURE_ATTR_DOMAIN,
 )
-
 from ..thermal_core.config import SceneThermalConfig
 from ..thermal_core.field import FieldSet, MeshSample, ObjectKey
+from ..thermal_core.op_registry import OpRegistry
 from ..thermal_core.pipeline import FailureReason, PipelineResult, BakingPipeline
 from ..ui.resolution import ConfigBuilder
 
@@ -234,15 +234,18 @@ class SceneBakeRunner:
         samples, sample_failures = MeshSampler.sample_for_config(objects, config)
         outcomes.update(sample_failures)
 
-        # 3. pure evaluation of modifiers and initialization steps.
+        # 3. pure evaluation
         pipeline = BakingPipeline()
-        result = pipeline.evaluate(config, samples, apply_operation=None)
+        result = pipeline.evaluate(
+            config,
+            samples,
+            apply_operation=OpRegistry.apply,
+            collections=ConfigBuilder.collection_membership(objects.values()),
+        )
         outcomes.update(SceneBakeRunner._outcomes_from_failures(result))
 
         # 4. back onto the meshes
-        outcomes.update(
-            AttributeWriter.write_all(objects, result.fields)
-        )
+        outcomes.update(AttributeWriter.write_all(objects, result.fields))
         return outcomes
 
     @staticmethod
@@ -259,10 +262,13 @@ class SceneBakeRunner:
 
 
 class BakeTemperatureOperator(Operator):
-    """ Resolves every mesh object in the scene's effective temperature-init spec and
-    bakes it into a per-vertex TEMPERATURE_ATTR_NAME float32 attribute.
+    """ Resolves every mesh object in the scene's effective temperature-init
+    spec and bakes it into a per-vertex TEMPERATURE_ATTR_NAME float attribute
+    (see constants.py).
 
-    Objects that fail to resolve for some reason are skipped.
+    Objects that fail to resolve, use a not-yet-implemented strategy or
+    reference a missing vertex group are skipped rather than blocking the
+    entire scene bake.
     """
     bl_idname = Labels.BAKE_TEMPERATURE.value
     bl_label = "Bake Initial Temperature"
@@ -280,10 +286,7 @@ class BakeTemperatureOperator(Operator):
 
         self.report({'WARNING'} if any_skipped else {'INFO'}, self.make_summary(outcomes))
 
-        if any_baked or not any_skipped:
-            return { 'FINISHED' }
-        else:
-            return {'CANCELLED'}
+        return {'FINISHED'} if any_baked or not any_skipped else {'CANCELLED'}
 
     @staticmethod
     def make_summary(outcomes: Dict[ObjectKey, BakeOutcome]) -> str:

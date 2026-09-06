@@ -74,33 +74,28 @@ class BakingPipeline:
         config: SceneThermalConfig,
         samples: Mapping[ObjectKey, MeshSample],
         apply_operation: Optional[ApplyOperationFn] = None,
+        collections: Optional[Mapping[ObjectKey, Tuple[str, ...]]] = None,
     ) -> PipelineResult:
-        """ Evaluate a config against the geometry it applies to
+        """ Evaluate a config against the geometry it applies to.
 
         :param config: sources and operations
         :param samples: geometry for each object named in config.sources
         :param apply_operation: how to run one operation. Required only when
             config.operations is non-empty
+        :param collections: object key -> the collections it belongs to, for
+            operations scoped by collection.
         """
-        # There are two sources of failures, failures to execute an initialization config
-        # and failure to execute post-processing operations
-
-        # 1] evaluate initialization step
-        fields, failures = BakingPipeline._evaluate_init(config, samples)
-        # 2] run postprocessing
+        fields, failures = BakingPipeline._evaluate_sources(config, samples, collections or {})
         failures += BakingPipeline._apply_operations(config, fields, apply_operation)
         return PipelineResult(fields=fields, failures=failures)
 
     @staticmethod
-    def _evaluate_init(
-        config: SceneThermalConfig, samples: Mapping[ObjectKey, MeshSample],
+    def _evaluate_sources(
+        config: SceneThermalConfig,
+        samples: Mapping[ObjectKey, MeshSample],
+        collections: Mapping[ObjectKey, Tuple[str, ...]],
     ) -> Tuple[FieldSet, Tuple[Failure, ...]]:
-        """ Run every source spec into its object's initial field.
-
-        This can generate two kinds of failures, the first if the initialization
-        strategy is not implemented,
-        the second if the specification of the initialization strategy is invalid.
-        """
+        """ Run every source spec into its object's initial field. """
         fields = FieldSet()
         failures = []
 
@@ -124,7 +119,7 @@ class BakingPipeline:
                 failures.append(Failure(FailureReason.INVALID_SPEC, str(error), key=key))
                 continue
 
-            fields.add(key, TemperatureField.build(values), sample)
+            fields.add(key, TemperatureField.build(values), sample, collections.get(key, ()))
 
         return fields, tuple(failures)
 

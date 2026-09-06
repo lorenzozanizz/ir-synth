@@ -1,26 +1,15 @@
 """
 Resolves an Object's *effective* temperature-init spec by walking the
-inheritance chain, and is simultaneously the conversion boundary: bpy
-PropertyGroup state goes in, a pure thermal_core.specs dataclass comes out.
+inheritance chain, and is simultaneously the conversion boundary.
 No bpy state should cross into thermal_core beyond this function - baking
-code should only ever see the result of resolve_object_spec(), never touch
-`obj.thermal_init` directly.
+code should only ever see the result of resolve_object_spec(), never touch the initialization
+directly.
 
 Chain walked for an object set to INHERIT:
     Object (if not INHERIT)
       -> Object's Collection(s) (if not INHERIT)
         -> Scene default (not yet implemented - see module note below)
 
-Lives in `ui/`, not `thermal_core/`, for the same reason strategy_registry.py
-does: it touches bpy.types.Object/Collection directly. thermal_core stays
-bpy-free.
-
-Scene-level fallback: thermal_core/properties.py's simulation_properties is
-still empty - there is no Scene-level thermal_init yet. Rather than invent
-one here, exhausting the Collection chain without a concrete answer is
-currently a resolution failure (UnresolvedSpecError). Adding a Scene default
-later is a one-function insertion (`_resolve_via_scene`) right before that
-raise, once Scene support is designed.
 """
 
 from typing import Dict, Iterable, List, Tuple
@@ -166,6 +155,21 @@ class ConfigBuilder:
         # This can cause unexpected behaviour and a user should be made aware
         # of this, TODO for docs
         return tuple(obj for obj in scene.objects if obj.type == 'MESH')
+
+    @staticmethod
+    def collection_membership(
+        objects: Iterable[Object],
+    ) -> Dict[ObjectKey, Tuple[str, ...]]:
+        """ Object key -> the names of every collection it belongs to.
+
+        Consumed by OpScope in COLLECTION mode. Collections are the mechanism
+        the UI pushes users toward for selecting a set of objects, since they
+        survive renames of their members and a hook can populate them.
+        """
+        return {
+            ConfigBuilder.object_key(obj): tuple(c.name for c in obj.users_collection)
+            for obj in objects
+        }
 
     @staticmethod
     def from_objects(

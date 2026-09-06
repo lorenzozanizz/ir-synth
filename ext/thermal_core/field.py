@@ -242,8 +242,15 @@ class FieldSet:
     def __init__(self) -> None:
         self._fields: Dict[ObjectKey, TemperatureField] = {}
         self._samples: Dict[ObjectKey, MeshSample] = {}
+        self._collections: Dict[ObjectKey, Tuple[str, ...]] = {}
 
-    def add(self, key: ObjectKey, field: TemperatureField, sample: MeshSample) -> None:
+    def add(
+        self,
+        key: ObjectKey,
+        field: TemperatureField,
+        sample: MeshSample,
+        collections: Tuple[str, ...] = (),
+    ) -> None:
         """ Register an object's initial field and its geometry.
 
         :raises ValueError: field length disagrees with the sample's vertex
@@ -258,6 +265,7 @@ class FieldSet:
             )
         self._fields[key] = field
         self._samples[key] = sample
+        self._collections[key] = tuple(collections)
 
     def set_field(self, key: ObjectKey, field: TemperatureField) -> None:
         """ Replace an existing object's field, keeping its geometry.
@@ -281,6 +289,14 @@ class FieldSet:
     def sample_for(self, key: ObjectKey) -> MeshSample:
         """ :raises KeyError: no entry for key. """
         return self._samples[key]
+
+    def collections_for(self, key: ObjectKey) -> Tuple[str, ...]:
+        """ Names of the collections an object belongs to.
+
+        Returns an empty tuple for an unknown key, so an operation scoped to a
+        collection simply does not select a deleted object rather than raising.
+        """
+        return self._collections.get(key, ())
 
     def keys(self) -> Tuple[ObjectKey, ...]:
         """ Every key, in insertion order.

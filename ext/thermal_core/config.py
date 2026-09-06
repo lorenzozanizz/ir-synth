@@ -1,21 +1,21 @@
 """
-The complete bpy-independent description of how a scene's temperature field is
-produced. There is one initial source spec per object, plus a scene-wide ordered list of
-operations applied afterwards to objects and groups of objects.
+The complete, bpy-free description of how a scene's temperature field is
+produced: one source spec per object, plus a scene-wide ordered list of
+operations applied afterwards.
 
+This is the only input `pipeline.evaluate` needs. The UI builds one from bpy
+state; a randomization hook builds or mutates one directly.
 """
 
 from dataclasses import asdict, dataclass, field, is_dataclass
-from typing import Any, Dict, Mapping, Tuple
 from enum import Enum
+from typing import Any, Dict, Mapping, Tuple
 
 from .field import ObjectKey
+# This time its a concrete implementation and not just a stub
+from .operations import FieldOperation
 from .specs import TempInitSpec
 
-
-# The pipeline treats operations opaquely and defers to an injected applier, so
-# nothing here needs the concrete type yet.
-FieldOperation = Any
 
 
 class ConfigError(Exception):
@@ -62,11 +62,11 @@ class SceneThermalConfig:
             except ValueError as error:
                 raise ConfigError(f"Operation {index} is invalid: {error}") from error
 
-    def only_init(self, sources: Mapping[ObjectKey, TempInitSpec]) -> "SceneThermalConfig":
+    def with_sources(self, sources: Mapping[ObjectKey, TempInitSpec]) -> "SceneThermalConfig":
         """ A copy carrying different sources and the same operations. """
         return SceneThermalConfig(sources=dict(sources), operations=self.operations)
 
-    def only_ops(self, operations: Tuple[FieldOperation, ...]) -> "SceneThermalConfig":
+    def with_operations(self, operations: Tuple[FieldOperation, ...]) -> "SceneThermalConfig":
         """ A copy carrying different operations and the same sources. """
         return SceneThermalConfig(sources=dict(self.sources), operations=tuple(operations))
 
@@ -109,11 +109,31 @@ class SceneThermalConfig:
                     f"Could not rebuild the source spec for {key!r}: {error}"
                 ) from error
 
-        return SceneThermalConfig(sources=sources)
+        operations = []
+        for index, entry in enumerate(data.get("operations", ())):
+            try:
+                op_class = FieldOperation.named(entry["type"])
+                operations.append(op_class.from_params(entry.get("params", {})))
+            except (KeyError, TypeError) as error:
+                raise ConfigError(
+                    f"Could not rebuild operation {index}: {error}"
+                ) from error
+
+        return SceneThermalConfig(sources=sources, operations=tuple(operations))
 
 
 def _tagged(item: Any) -> Dict[str, Any]:
     """ A dataclass as {"type": class name, "params": its fields}. """
     if not is_dataclass(item):
         raise ConfigError(f"{type(item).__name__} is not a dataclass and cannot be serialized")
-    return {"type": type(item).__name__, "params": asdict(item)}
+    return {"type": type(item).__name__, "params": asdict(item, dict_factory=_json_safe)}
+
+
+# bug fix: previous version serialized incorrectly.
+def _json_safe(pairs) -> Dict[str, Any]:
+    """ asdict dict_factory that converts Enum members to their names.
+    """
+    return {
+        key: (value.name if isinstance(value, Enum) else value)
+        for key, value in pairs
+    }
