@@ -228,7 +228,6 @@ class SceneBakeRunner:
         outcomes: dict[str, BakeOutcome] = {
             key: BakeOutcome.SKIPPED_UNRESOLVED for key in unresolved
         }
-
         # 2. bpy -> geometry
         # Extract the geometry at bake time to be employed for modifiers.
         samples, sample_failures = MeshSampler.sample_for_config(objects, config)
@@ -281,6 +280,8 @@ class BakeTemperatureOperator(Operator):
     def execute(self, context):
         outcomes = SceneBakeRunner.run(context.scene)
 
+        # Report if any baking has failed (this can happen for multiple reasons, see any
+        # BakeOutcome != BAKED)
         any_baked = any(outcome is BakeOutcome.BAKED for outcome in outcomes.values())
         any_skipped = any(outcome is not BakeOutcome.BAKED for outcome in outcomes.values())
 

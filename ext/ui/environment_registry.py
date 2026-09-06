@@ -5,8 +5,9 @@ class and the attribute it lives under on EnvironmentFactorItem.
 """
 
 from abc import ABC, abstractmethod
-
+from typing import Optional
 from bpy.types import PropertyGroup, UILayout
+import bpy
 
 from ..thermal_core.contracts import EnvironmentSpecType
 from ..thermal_core.specs import EnvironmentFactorSpec, AmbientTemperatureSpec
@@ -79,3 +80,16 @@ class AmbientTemperatureDescriptor(EnvironmentFactorDescriptor):
     def build(props: EnvironmentAmbientTemperatureProperties) -> AmbientTemperatureSpec:
         unit = TempUnit[props.unit]
         return AmbientTemperatureSpec(value_k=Conversions.to_kelvin(props.value, unit))
+
+
+class EnvSearch:
+
+    @staticmethod
+    def search(spec_type: EnvironmentSpecType) -> Optional[EnvironmentFactorDescriptor]:
+        """ Search for the existence of a configuration in the environment properties """
+        for item in bpy.context.scene.thermal_environment.factors:
+            if EnvironmentSpecType[item.factor_type] is not spec_type:
+                continue
+            descriptor = EnvironmentFactorRegistry.get(spec_type)
+            return descriptor
+        return None

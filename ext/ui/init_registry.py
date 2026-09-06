@@ -19,7 +19,8 @@ from ..operators.names import Labels
 from .properties import (
     AmbientTempProperties, GradientTempProperties, UniformTempProperties, WeightPaintedTempProperties,
 )
-from .environment_registry import EnvironmentFactorRegistry
+from .text_wrap_utils import WrapWidget
+from .environment_registry import EnvironmentFactorRegistry, EnvSearch
 
 
 class StrategyDescriptor(ABC):
@@ -120,8 +121,10 @@ class InitAmbient(StrategyDescriptor):
 
     @staticmethod
     def draw(layout: UILayout, props: AmbientTempProperties) -> None:
-        layout.prop(props, "value")
-        layout.prop(props, "unit")
+        # If the ambient temperature is not set, this cannot be used.
+        if EnvSearch.search(EnvironmentSpecType.AMBIENT_TEMPERATURE) is None:
+            WrapWidget.draw(layout, bpy.context, "This initialization requires to configure "
+                "the ambient temperature scene property", "warning_large")
 
     @staticmethod
     def build(props: AmbientTempProperties) -> AmbientTempSpec:
@@ -140,12 +143,8 @@ class InitAmbient(StrategyDescriptor):
             descriptor = EnvironmentFactorRegistry.get(EnvironmentSpecType.AMBIENT_TEMPERATURE)
             sub_props = getattr(item, descriptor.attr_name)
             return descriptor.build(sub_props).value_k
-
-        raise ValueError(
-            "InitType.AMBIENT requires an 'Ambient Temperature' entry in "
-            "Scene Properties > Thermal Environment."
-        )
-
+        # An invalid kelvin value, will fail when calling validate()
+        return -1
 
 @InitStrategyRegistry.register(init_type=InitType.GRADIENT)
 class InitGradient(StrategyDescriptor):
