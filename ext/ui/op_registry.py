@@ -11,8 +11,13 @@ from typing import Tuple, Type
 from bpy.types import PropertyGroup, UILayout
 
 from ..thermal_core.contracts import OpType, ScopeMode
-from ..thermal_core.operations import ClampOp, FieldOperation
-from .op_properties import ClampOpProperties, OpScopeProperties, ThermalOpEntry
+from ..thermal_core.operations import (
+    ClampOp, ContactDiffusionOp, FieldOperation, SmoothOp,
+)
+from .op_properties import (
+    ClampOpProperties, ContactDiffusionOpProperties, OpScopeProperties,
+    SmoothOpProperties, ThermalOpEntry,
+)
 
 
 def draw_scope(
@@ -98,6 +103,9 @@ class OperationDescriptor(ABC):
     @abstractmethod
     def build(props: PropertyGroup) -> FieldOperation:
         """ Build the operation from its own parameters only.
+
+        enabled and seed live on ThermalOpEntry and are applied by
+        OperationRegistry.build_entry, so no descriptor has to handle them.
         """
         pass
 
@@ -164,6 +172,9 @@ class OperationRegistry:
     @staticmethod
     def build_stack(stack) -> Tuple[FieldOperation, ...]:
         """ Build every entry in a ThermalStackProperties, in order.
+
+        Entries whose op_type has no descriptor are skipped rather than
+        raising, matching how unimplemented init strategies are handled.
         """
         operations = []
         for entry in stack.entries:
@@ -205,4 +216,66 @@ class ClampDescriptor(OperationDescriptor):
             scope=props.scope.to_spec(),
             min_k=props.min_k(),
             max_k=props.max_k(),
+        )
+
+
+@OperationRegistry.register(op_type=OpType.SMOOTH)
+class SmoothDescriptor(OperationDescriptor):
+
+    op_type = OpType.SMOOTH
+    property_group = SmoothOpProperties
+    attr_name = "smooth"
+    label = "Smooth"
+    category = "Filters"
+    icon = 'MOD_SMOOTH'
+
+    @staticmethod
+    def draw(layout: UILayout, props: SmoothOpProperties, entry_index: int) -> None:
+        draw_scope(layout, props.scope, entry_index)
+        column = layout.column(align=True)
+        column.prop(props, "iterations")
+        column.prop(props, "factor")
+
+    @staticmethod
+    def build(props: SmoothOpProperties) -> SmoothOp:
+        return SmoothOp(
+            scope=props.scope.to_spec(),
+            iterations=props.iterations,
+            factor=props.factor,
+        )
+
+
+@OperationRegistry.register(op_type=OpType.CONTACT_DIFFUSION)
+class ContactDiffusionDescriptor(OperationDescriptor):
+    """ The two-scope case. draw_scope is called twice with different
+    scope_path values so each block's buttons address the right one.
+    """
+
+    op_type = OpType.CONTACT_DIFFUSION
+    property_group = ContactDiffusionOpProperties
+    attr_name = "contact_diffusion"
+    label = "Contact Diffusion"
+    category = "Coupling"
+    icon = 'MOD_SOFT'
+
+    @staticmethod
+    def draw(layout: UILayout, props: ContactDiffusionOpProperties, entry_index: int) -> None:
+        draw_scope(layout, props.source, entry_index, "source", label="Sources")
+        layout.separator()
+        draw_scope(layout, props.receiver, entry_index, "receiver", label="Receivers")
+        layout.separator()
+
+        column = layout.column(align=True)
+        column.prop(props, "radius")
+        column.prop(props, "strength")
+        column.prop(props, "falloff")
+
+    @staticmethod
+    def build(props: ContactDiffusionOpProperties) -> ContactDiffusionOp:
+        return ContactDiffusionOp(
+            source=props.source.to_spec(),
+            receiver=props.receiver.to_spec(),
+            radius=props.radius,
+            strength=props.strength,
+            falloff=props.falloff,
         )

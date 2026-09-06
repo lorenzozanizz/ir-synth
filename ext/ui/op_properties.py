@@ -87,6 +87,59 @@ class ClampOpProperties(PropertyGroup):
         return Conversions.to_kelvin(self.max_value, TempUnit[self.unit])
 
 
+class SmoothOpProperties(PropertyGroup):
+    """ UI state for thermal_core.operations.SmoothOp. """
+
+    scope: PointerProperty(type=OpScopeProperties)                      # type: ignore
+    iterations: IntProperty(                                            # type: ignore
+        name="Iterations",
+        description="Each pass spreads heat by one edge. This sets how far "
+                    "smoothing reaches, not how strong it is",
+        default=5,
+        min=0,
+        soft_max=50,
+    )
+    factor: FloatProperty(                                              # type: ignore
+        name="Factor",
+        description="How far toward the neighbour average each pass moves",
+        default=0.5,
+        min=0.0,
+        max=1.0,
+        soft_max=0.5,
+    )
+
+
+class ContactDiffusionOpProperties(PropertyGroup):
+    """ UI state for thermal_core.operations.ContactDiffusionOp. """
+
+    source: PointerProperty(type=OpScopeProperties)                     # type: ignore
+    receiver: PointerProperty(type=OpScopeProperties)                   # type: ignore
+    radius: FloatProperty(                                              # type: ignore
+        name="Radius",
+        description="World-space distance beyond which a receiver vertex is unaffected",
+        default=0.1,
+        min=0.0001,
+        soft_max=2.0,
+        unit='LENGTH',
+    )
+    strength: FloatProperty(                                            # type: ignore
+        name="Strength",
+        description="Maximum blend toward the source temperature, at zero distance",
+        default=0.8,
+        min=0.0,
+        max=1.0,
+    )
+    falloff: EnumProperty(                                              # type: ignore
+        name="Falloff",
+        description="How the blend decays from the source out to the radius",
+        items=[
+            ("LINEAR", "Linear", "Linear decay to zero at the radius"),
+            ("EASE_IN_OUT", "Ease In/Out", "Smoothstep decay to zero at the radius"),
+        ],
+        default="EASE_IN_OUT",
+    )
+
+
 class ThermalOpEntry(PropertyGroup):
     """ One entry in the scene's operation stack. """
 
@@ -102,7 +155,7 @@ class ThermalOpEntry(PropertyGroup):
     )
     enabled: BoolProperty(                                              # type: ignore
         name="Enabled",
-        description="Disabled operations are not deleted but are skipped when baking",
+        description="Disabled operations stay in the stack but are skipped when baking",
         default=True,
     )
     seed: IntProperty(                                                  # type: ignore
@@ -119,6 +172,8 @@ class ThermalOpEntry(PropertyGroup):
     # to the op_type. Every operations needs to be added here.
     # This really takes at most 100 bytes per operation, negligible.
     clamp: PointerProperty(type=ClampOpProperties)                      # type: ignore
+    smooth: PointerProperty(type=SmoothOpProperties)                    # type: ignore
+    contact_diffusion: PointerProperty(type=ContactDiffusionOpProperties)   # type: ignore
 
 
 class ThermalStackProperties(PropertyGroup):

@@ -256,3 +256,79 @@ class ClampOp(PerObjectOperation):
 
     def describe(self) -> str:
         return f"Clamp {self.min_k:g}-{self.max_k:g}K ({self.scope.describe()})"
+
+
+@dataclass(frozen=True)
+class SmoothOp(PerObjectOperation):
+    """ Average each vertex toward its edge neighbours.
+
+    :param iterations: how many averaging passes to run. Each pass spreads
+        heat by one edge, so the distance smoothing reaches is set by this,
+        not by factor.
+    :param factor: how far toward the neighbour average each pass moves, in
+        [0, 1]. Above ~0.5 successive passes can oscillate on irregular
+        meshes, which is why the UI soft-caps it there.
+    """
+
+    iterations: int = 5
+    factor: float = 0.5
+
+    @property
+    def op_type(self) -> OpType:
+        return OpType.SMOOTH
+
+    def validate(self) -> None:
+        super().validate()
+        if self.iterations < 0:
+            raise ValueError(f"SmoothOp.iterations ({self.iterations}) cannot be negative")
+        if not 0.0 <= self.factor <= 1.0:
+            raise ValueError(f"SmoothOp.factor ({self.factor}) must be in [0, 1]")
+
+    def describe(self) -> str:
+        return f"Smooth x{self.iterations} ({self.scope.describe()})"
+
+
+@dataclass(frozen=True)
+class ContactDiffusionOp(SceneOperation):
+    """ Warm receiver objects according to their proximity to source objects.
+    This is a static approximation of an already-diffused state, not
+    a simulation, there is no time or physicss.
+
+    :param source: objects whose temperatures are read.
+    :param receiver: objects whose temperatures are modified. An object in
+        both scopes never acts as its own source.
+    :param radius: metres, in world space. Beyond this a receiver vertex is
+        not considered in the diffusion.
+    :param strength: maximum blend toward the source temperature, at zero
+        distance, in [0, 1].
+    :param falloff: how the blend decays from 1 at zero distance to 0 at
+        radius. Same names as the weight-paint falloffs.
+    """
+
+    source: OpScope = OpScope()
+    receiver: OpScope = OpScope()
+    radius: float = 0.1
+    strength: float = 0.8
+    falloff: str = "EASE_IN_OUT"
+
+    @property
+    def op_type(self) -> OpType:
+        return OpType.CONTACT_DIFFUSION
+
+    def scopes(self) -> Tuple[OpScope, ...]:
+        return (self.source, self.receiver)
+
+    def validate(self) -> None:
+        super().validate()
+        if self.radius <= 0.0:
+            raise ValueError(f"ContactDiffusionOp.radius ({self.radius}) must be positive")
+        if not 0.0 <= self.strength <= 1.0:
+            raise ValueError(
+                f"ContactDiffusionOp.strength ({self.strength}) must be in [0, 1]"
+            )
+
+    def describe(self) -> str:
+        return (
+            f"Diffuse {self.source.describe()} -> {self.receiver.describe()} "
+            f"@ {self.radius:g}m"
+        )

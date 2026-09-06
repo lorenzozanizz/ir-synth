@@ -9,6 +9,8 @@ from .op_properties import (
     ClampOpProperties,
     ThermalOpEntry,
     ThermalStackProperties,
+    ContactDiffusionOpProperties,
+    SmoothOpProperties
 )
 from .op_registry import OperationRegistry, OperationDescriptor
 from .stack_panel import AddOperationMenu, OperationStackPanel
@@ -51,6 +53,8 @@ classes = (
     ObjectRefProperties,
     OpScopeProperties,
     ClampOpProperties,
+    SmoothOpProperties,
+    ContactDiffusionOpProperties,
     ThermalOpEntry,
     ThermalStackProperties,
     MainPanel,

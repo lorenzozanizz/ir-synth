@@ -17,6 +17,7 @@ from ..shaders.registry import ShaderRegistry
 from ..shaders.transfer import TransferNodeRegistry
 from .init_registry import InitStrategyRegistry
 from .text_wrap_utils import WrapWidget
+from .environment_registry import EnvironmentFactorRegistry
 from .resolution import ConfigBuilder, SpecsResolver, SpecResolutionError
 from .color_bar_gpu import left_bottom_color_bar
 
