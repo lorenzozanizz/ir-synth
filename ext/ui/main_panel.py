@@ -16,9 +16,8 @@ from ..thermal_core.contracts import (
 from ..shaders.registry import ShaderRegistry
 from ..shaders.transfer import TransferNodeRegistry
 from .init_registry import InitStrategyRegistry
-from .environment_registry import EnvironmentFactorRegistry
 from .text_wrap_utils import WrapWidget
-from .resolution import ConfigBuilder
+from .resolution import ConfigBuilder, SpecsResolver, SpecResolutionError
 from .color_bar_gpu import left_bottom_color_bar
 
 
@@ -311,6 +310,7 @@ class MainPanel(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = MAIN_PANEL_NAME
+    bl_order = 0
 
     def draw(self, context: Context) -> None:
         panel = CentralPanel(sections=[
@@ -328,6 +328,9 @@ class BakePanel(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = MAIN_PANEL_NAME
+    # After Field Operations (bl_order 1): the bake is what you press once the
+    # stack is how you want it.
+    bl_order = 2
 
     def draw(self, context: Context) -> None:
         panel = CentralPanel(sections=[
@@ -346,7 +349,7 @@ class ThermographyPanel(Panel):
     bl_category = MAIN_PANEL_NAME
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_order = 2
+    bl_order = 3
 
     def draw(self, context: Context) -> None:
         panel = CentralPanel(sections=[
@@ -427,5 +430,11 @@ class InfoPanel(Panel):
         op = row.operator(Labels.OPEN_URL.value, text="Documentation", icon='FILE_FOLDER')
         op.url = DOCU_URL
 
-class PropagatePanel(Panel):
+class SmoothSection(UISection):
+    pass
+
+class PropagateSection(UISection):
+    pass
+
+class TempEditorPanel(Panel):
     pass

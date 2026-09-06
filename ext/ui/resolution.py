@@ -198,5 +198,16 @@ class ConfigBuilder:
 
     @staticmethod
     def from_scene(scene) -> Tuple[SceneThermalConfig, Dict[ObjectKey, Exception]]:
-        """ from_objects over every mesh object in the scene. """
-        return ConfigBuilder.from_objects(ConfigBuilder.mesh_objects(scene))
+        """ The complete config: every mesh object's source, plus the scene's
+        operation stack.
+
+        Imported lazily because ui/op_registry.py is a UI concern and this
+        module is imported by the bake path.
+        """
+        from .op_registry import OperationRegistry
+
+        config, unresolved = ConfigBuilder.from_objects(ConfigBuilder.mesh_objects(scene))
+        stack = getattr(scene, "thermal_stack", None)
+        if stack is None:
+            return config, unresolved
+        return config.with_operations(OperationRegistry.build_stack(stack)), unresolved

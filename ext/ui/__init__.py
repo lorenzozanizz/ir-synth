@@ -1,5 +1,5 @@
 from .main_panel import (
-    MainPanel, ThermographyPanel, InfoPanel, CollectionSpecPanel, BakePanel, EnvironmentPanel,
+    MainPanel, ThermographyPanel, InfoPanel, CollectionSpecPanel, BakePanel, EnvironmentPanel
 )
 
 from .op_properties import (
@@ -10,6 +10,8 @@ from .op_properties import (
     ThermalOpEntry,
     ThermalStackProperties,
 )
+from .op_registry import OperationRegistry, OperationDescriptor
+from .stack_panel import AddOperationMenu, OperationStackPanel
 
 from .properties import (
     data_properties,
@@ -52,6 +54,8 @@ classes = (
     ThermalOpEntry,
     ThermalStackProperties,
     MainPanel,
+    AddOperationMenu,
+    OperationStackPanel,
     ThermographyPanel,
     BakePanel,
     CollectionSpecPanel,

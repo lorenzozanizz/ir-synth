@@ -3,6 +3,9 @@ from .visualization import (VisualizeTemperatureOperator, FitDisplaySpanOperator
                             ShowColorBarOperator, HideColorBarOperator)
 from .environment import AddEnvironmentFactorOperator, RemoveEnvironmentFactorOperator
 from .gradient_points import SetGradientPointFromCursorOperator, VisualizeGradientPointsOperator
+from .stack import (AddOperationOperator, RemoveOperationOperator, MoveOperationOperator,
+                    DuplicateOperationOperator, IsolateOperationOperator,
+                    AddScopeObjectOperator, RemoveScopeObjectOperator)
 
 classes = (
     BakeTemperatureOperator,
@@ -11,6 +14,9 @@ classes = (
     HideColorBarOperator,
     ShowColorBarOperator,
     AddEnvironmentFactorOperator,
+    AddOperationOperator, RemoveOperationOperator, MoveOperationOperator,
+    DuplicateOperationOperator, IsolateOperationOperator,
+    AddScopeObjectOperator, RemoveScopeObjectOperator,  
     RemoveEnvironmentFactorOperator,
     SetGradientPointFromCursorOperator,
     VisualizeGradientPointsOperator,
