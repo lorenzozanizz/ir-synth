@@ -1,6 +1,16 @@
 from .main_panel import (
     MainPanel, ThermographyPanel, InfoPanel, CollectionSpecPanel, BakePanel, EnvironmentPanel,
 )
+
+from .op_properties import (
+    stack_properties,
+    ObjectRefProperties,
+    OpScopeProperties,
+    ClampOpProperties,
+    ThermalOpEntry,
+    ThermalStackProperties,
+)
+
 from .properties import (
     data_properties,
     scene_properties,
@@ -17,7 +27,7 @@ from .properties import (
     EnvironmentSettings,
 )
 
-properties = data_properties + scene_properties
+properties = data_properties + scene_properties + stack_properties
 
 
 # PropertyGroup classes referenced via PointerProperty (Uniform/WeightPainted) must be
@@ -36,6 +46,11 @@ classes = (
     EnvironmentAmbientTemperatureProperties,
     EnvironmentFactorItem,
     EnvironmentSettings,
+    ObjectRefProperties,
+    OpScopeProperties,
+    ClampOpProperties,
+    ThermalOpEntry,
+    ThermalStackProperties,
     MainPanel,
     ThermographyPanel,
     BakePanel,
