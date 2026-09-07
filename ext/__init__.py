@@ -72,3 +72,8 @@ def unregister():
     # Unregister all previously registered classes
     for cls in reversed(registration_classes):
         bpy.utils.unregister_class(cls)
+
+    from .ui.color_bar_gpu import left_bottom_color_bar
+    from .ui.gradient_gpu import gradient_overlay
+    left_bottom_color_bar.hide()
+    gradient_overlay.hide()

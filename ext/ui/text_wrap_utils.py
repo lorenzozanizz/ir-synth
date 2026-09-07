@@ -74,7 +74,7 @@ class WrapWidget:
 
                 # Only show icon on first chunk of first line, do not show it again every other line
                 if i == 0:
-                    row.label(text=chunk, icon="INFO")
+                    row.label(text=chunk, icon=icon)
                 else:
                     row.label(text=chunk)
         layout.separator()

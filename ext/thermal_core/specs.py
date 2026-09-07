@@ -119,6 +119,11 @@ class GradientTempSpec(TempInitSpec):
     value_a_k: float
     value_b_k: float
 
+    # Since these specs are serializable, we have to be sure that we're handling
+    # tuples and not random collections which cannot be easily compared with == or !=
+    def __post_init__(self):
+        object.__setattr__(self, "point_a", tuple(float(v) for v in self.point_a))
+
     @property
     def init_type(self) -> InitType:
         return InitType.GRADIENT

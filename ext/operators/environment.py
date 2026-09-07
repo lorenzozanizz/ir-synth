@@ -50,6 +50,10 @@ class RemoveEnvironmentFactorOperator(Operator):
 
     def execute(self, context: Context) -> set:
         settings = context.scene.thermal_environment
-        settings.factors.remove(self.index)
-        settings.active_index = min(settings.active_index, max(0, len(settings.factors) - 1))
+        entries = settings.factors
+        if not 0 <= self.index < len(entries):
+            self.report({'WARNING'}, "That operation no longer exists")
+            return {'CANCELLED'}
+        entries.remove(self.index)
+        settings.active_index = min(settings.active_index, max(0, len(entries) - 1))
         return {'FINISHED'}
