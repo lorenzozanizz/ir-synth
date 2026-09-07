@@ -198,7 +198,6 @@ def _blend_toward_sources(
     receiver_values: np.ndarray,
     source_positions: np.ndarray,
     source_values: np.ndarray,
-    block_size: int = 2048,
 ) -> np.ndarray:
     """ For each receiver vertex, blend toward its nearest source within radius.
 
@@ -206,7 +205,8 @@ def _blend_toward_sources(
         source at once
     """
     result = receiver_values.copy()
-
+    # Actually cap this so that we do not allocate huge vectors for no reason.
+    block_size = max(1, 1_000_000 // max(1, source_positions.shape[0] * 3))
     for start in range(0, receiver_positions.shape[0], block_size):
         block = receiver_positions[start:start + block_size]
 

@@ -263,7 +263,7 @@ class ThermalRenderSettings(PropertyGroup):
         name="Unit",
         description="Display unit for the reflected temperature above",
         items=[(u.name, u.value, "") for u in TempUnit],
-        default=TempUnit.KELVIN.name,
+        default=TempUnit.CELSIUS.name,
     )
 
     terminal_mode: EnumProperty(                                        # type: ignore

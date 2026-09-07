@@ -265,7 +265,6 @@ class ColorBar:
         raise ValueError("Colors must contain 3 (RGB) or 4 (RGBA) values.")
 
     @staticmethod
-    @staticmethod
     def _nice_ticks(vmin, vmax, count):
         """Generate approximately count uniformly spaced, visually nice ticks.
 

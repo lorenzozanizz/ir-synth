@@ -9,7 +9,7 @@ License: MIT
 bl_info = {
     "name": "Thermal",
     "author": "lorenzozanizz",
-    "version": (1, 0, 0),
+    "version": (0, 9, 0),
     "blender": (4, 5, 0),
     "location": "Sidebar > Thermography",
     "description": "An extension to synthetically generate thermal imaging data in Blender",
