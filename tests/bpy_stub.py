@@ -9,6 +9,7 @@ if "bpy" not in sys.modules:
     bpy_props = types.ModuleType("bpy.props")
     bpy_utils = types.ModuleType("bpy.utils")
     gpu_extras_batch = types.ModuleType("gpu_extras.batch")
+
     gpu = types.ModuleType("gpu")
     blf = types.ModuleType("blf")
     gpu_shader = types.ModuleType("gpu.shader")
@@ -51,7 +52,14 @@ if "bpy" not in sys.modules:
         pass
 
     class Context:
-        pass
+
+        class Scene:
+
+            class ThermalEnvironment:
+
+                factors = []
+            thermal_environment = ThermalEnvironment()
+        scene = Scene()
 
     class ShaderNodeTree:
         pass
@@ -95,9 +103,11 @@ if "bpy" not in sys.modules:
     bpy_utils.unregister_class = lambda cls: None
     gpu_shader.from_builtin = _from_builtin
 
+    bpy.context = Context
     bpy.types = bpy_types
     bpy.props = bpy_props
     bpy.utils = bpy_utils
+
 
     gpu.shader = gpu_shader
 
