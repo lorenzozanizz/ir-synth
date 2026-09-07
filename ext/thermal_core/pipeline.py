@@ -100,8 +100,8 @@ class BakingPipeline:
         failures = []
 
         for key in config.keys():
-            sample = samples.get(key)
-            if sample is None:
+            mesh_data = samples.get(key)
+            if mesh_data is None:
                 failures.append(Failure(
                     reason=FailureReason.MISSING_GEOMETRY,
                     detail=f"No MeshSample was supplied for {key!r}",
@@ -111,15 +111,19 @@ class BakingPipeline:
 
             spec = config.sources[key]
             try:
-                values = BakeStrategyRegistry.evaluate(spec, sample)
+                values = BakeStrategyRegistry.evaluate(spec, mesh_data)
             except NotImplementedError as error:
                 failures.append(Failure(FailureReason.NOT_IMPLEMENTED, str(error), key=key))
                 continue
             except ValueError as error:
                 failures.append(Failure(FailureReason.INVALID_SPEC, str(error), key=key))
                 continue
-
-            fields.add(key, TemperatureField.build(values), sample, collections.get(key, ()))
+            field = TemperatureField.build(values)
+            try:
+                field.validate()
+                fields.add(key, field, mesh_data, collections.get(key, ()))
+            except ValueError as error:
+                failures.append(Failure(FailureReason.INVALID_SPEC, str(error), key=key))
 
         return fields, tuple(failures)
 
