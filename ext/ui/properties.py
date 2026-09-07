@@ -48,7 +48,7 @@ class UniformTempProperties(PropertyGroup):
         name="Unit",
         description="Display unit for the temperature value above",
         items=[(u.name, u.value, "") for u in TempUnit],
-        default=TempUnit.CELSIUS.name,
+        default=TempUnit.KELVIN.name,
     )
 
 
@@ -91,7 +91,7 @@ class GradientTempProperties(PropertyGroup):
         name="Unit",
         description="Display unit for the Value A/B temperatures above",
         items=[(u.name, u.value, "") for u in TempUnit],
-        default=TempUnit.CELSIUS.name,
+        default=TempUnit.KELVIN.name,
     )
 
 
@@ -118,7 +118,7 @@ class WeightPaintedTempProperties(PropertyGroup):
         name="Unit",
         description="Display unit for the min/max temperature values above",
         items=[(u.name, u.value, "") for u in TempUnit],
-        default=TempUnit.CELSIUS.name,
+        default=TempUnit.KELVIN.name,
     )
     falloff: EnumProperty(                                                              # type: ignore
         name="Falloff",
@@ -147,7 +147,7 @@ class EnvironmentAmbientTemperatureProperties(PropertyGroup):
         name="Unit",
         description="Display unit for the temperature value above",
         items=[(u.name, u.value, "") for u in TempUnit],
-        default=TempUnit.CELSIUS.name,
+        default=TempUnit.KELVIN.name,
     )
 
 
@@ -257,7 +257,7 @@ class ThermalRenderSettings(PropertyGroup):
         name="Unit",
         description="Display unit for the reflected temperature above",
         items=[(u.name, u.value, "") for u in TempUnit],
-        default=TempUnit.CELSIUS.name,
+        default=TempUnit.KELVIN.name,
     )
 
     terminal_mode: EnumProperty(                                        # type: ignore
@@ -283,7 +283,7 @@ class ThermalRenderSettings(PropertyGroup):
         name="Unit",
         description="Display unit for the span above",
         items=[(u.name, u.value, "") for u in TempUnit],
-        default=TempUnit.CELSIUS.name,
+        default=TempUnit.KELVIN.name,
     )
 
     def reflected_temperature_k(self) -> float:
