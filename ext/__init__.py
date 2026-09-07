@@ -1,3 +1,5 @@
+import sys
+
 """ Thermal
 GitHub: https://github.com/lorenzozanizz/bl-thermal
 
@@ -15,9 +17,6 @@ bl_info = {
     "description": "An extension to synthetically generate thermal imaging data in Blender",
     "category": "Physics",
 }
-
-
-import sys
 
 
 # Do not register the BPY module if we are testing

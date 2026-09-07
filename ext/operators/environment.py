@@ -24,6 +24,7 @@ class AddEnvironmentFactorOperator(Operator):
     )
 
     def execute(self, context: Context) -> set:
+        """ Execute the operation adding it to the global environment """
         settings = context.scene.thermal_environment
 
         if any(item.factor_type == self.factor_type for item in settings.factors):
@@ -49,6 +50,7 @@ class RemoveEnvironmentFactorOperator(Operator):
     index: IntProperty()                                                  # type: ignore
 
     def execute(self, context: Context) -> set:
+        """ Remove an operation. Checks boundary of env variable index. """
         settings = context.scene.thermal_environment
         entries = settings.factors
         if not 0 <= self.index < len(entries):

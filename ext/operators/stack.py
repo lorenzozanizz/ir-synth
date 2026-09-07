@@ -47,6 +47,7 @@ class StackAddressing:
 
     @staticmethod
     def entries(context):
+        """ Get the entries for a stack """
         return context.scene.thermal_stack.entries
 
     @staticmethod
@@ -91,6 +92,8 @@ class AddOperationOperator(Operator):
     scope_path: StringProperty(default="scope")                         # type: ignore
 
     def execute(self, context):
+        """ Add a scene level operation to the scene. The operation will require
+        further configuration. """
         op_type = OpType[self.op_type]
         try:
             descriptor = OperationRegistry.get(op_type)
@@ -130,6 +133,7 @@ class RemoveOperationOperator(Operator):
     index: IntProperty(default=-1)                                      # type: ignore
 
     def execute(self, context):
+        """ Remove an operation from the stack"""
         entries = StackAddressing.entries(context)
         if not 0 <= self.index < len(entries):
             self.report({'WARNING'}, "That operation no longer exists")
@@ -153,6 +157,7 @@ class MoveOperationOperator(Operator):
     direction: IntProperty(default=-1)                                  # type: ignore
 
     def execute(self, context):
+        """ Move an operation up or down in the stack """
         entries = StackAddressing.entries(context)
         destination = self.index + self.direction
         if not (0 <= self.index < len(entries) and 0 <= destination < len(entries)):
@@ -171,6 +176,7 @@ class DuplicateOperationOperator(Operator):
     index: IntProperty(default=-1)                                      # type: ignore
 
     def execute(self, context):
+        """ Duplicate an operation in the stack """
         entries = StackAddressing.entries(context)
         if not 0 <= self.index < len(entries):
             self.report({'WARNING'}, "That operation no longer exists")
@@ -196,6 +202,7 @@ class IsolateOperationOperator(Operator):
     index: IntProperty(default=-1)                                      # type: ignore
 
     def execute(self, context):
+        """ Expand one operation """
         entries = StackAddressing.entries(context)
         if not 0 <= self.index < len(entries):
             return {'CANCELLED'}
@@ -215,6 +222,7 @@ class AddScopeObjectOperator(Operator):
     scope_path: StringProperty(default="scope")                         # type: ignore
 
     def execute(self, context):
+        """ Add an empty object slot to an operation's explicit scope """
         scope = StackAddressing.scope(context, self.index, self.scope_path)
         if scope is None:
             return {'CANCELLED'}
@@ -234,6 +242,7 @@ class RemoveScopeObjectOperator(Operator):
     object_index: IntProperty(default=-1)                               # type: ignore
 
     def execute(self, context):
+        """ Remove an object slot from the operation's explicit scope """
         scope = StackAddressing.scope(context, self.index, self.scope_path)
         if scope is None or not 0 <= self.object_index < len(scope.objects):
             return {'CANCELLED'}

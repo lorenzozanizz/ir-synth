@@ -67,7 +67,7 @@ class VisualizeGradientPointsOperator(_GradientTargetMixin, Operator):
     )
     target_name: StringProperty()                                          # type: ignore
 
-    def execute(self, context: Context) -> set:
+    def execute(self, _context: Context) -> set:
         from ..ui.init_registry import InitGradient  # local import: avoids a
                                                        # ui<->operators circular import
 
