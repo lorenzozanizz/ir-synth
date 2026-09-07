@@ -65,6 +65,9 @@ class TransferSpec(ABC):
         :param temperatures_k: per-vertex Kelvin values, any shape.
         """
         low, high = self.valid_temperature_range()
+        # Cant compute min or max on empty meshes, bugfixed
+        if temperatures_k.size <= 0:
+            return
         observed_min = float(np.min(temperatures_k))
         observed_max = float(np.max(temperatures_k))
 
@@ -282,7 +285,8 @@ def _evaluate_rbfo(spec: RBFOTransferSpec, temperatures_k: np.ndarray) -> np.nda
     t, so the warning is suppressed and the result used directly.
     """
     with np.errstate(over='ignore', divide='ignore', invalid='ignore'):
-        denominator = np.exp(spec.b / temperatures_k) - spec.f
+        denominator = np.exp(np.clip(spec.b / temperatures_k, a_max=MAX_EXPONENT_ARGUMENT, a_min=None)) - spec.f
+        np.clip(denominator, a_min=UNDERFLOW_GUARD, a_max=None, out=denominator)
         signal = spec.r / denominator + spec.o
 
     # exp() overflowing to inf leaves R/inf == 0 and signal == O, which is

@@ -11,6 +11,7 @@ from typing import Dict, Tuple, Type
 
 from bpy.types import NodeSocket, PropertyGroup, ShaderNodeTree, UILayout
 
+from ..physical_constants import UNDERFLOW_GUARD, MAX_EXPONENT_ARGUMENT
 from ..thermal_core.contracts import TransferType
 from ..thermal_core.radiometry import (
     MIN_TRANSFER_TEMPERATURE_K, RBFOTransferSpec, TransferSpec,
@@ -112,8 +113,6 @@ class RBFOTransfer(TransferDescriptor):
     property_group = RBFOTransferProperties
     attr_name = "rbfo"
 
-    MAX_EXPONENT_ARGUMENT = 80
-
     @staticmethod
     def draw(layout: UILayout, props: RBFOTransferProperties) -> None:
         column = layout.column(align=True)
@@ -140,12 +139,12 @@ class RBFOTransfer(TransferDescriptor):
         # B / T, with B in input 0.
         chain.step('DIVIDE', props.b, socket_index=1, label="B / T")
         # this applies min(const, exponent)
-        chain.step('MINIMUM', RBFOTransfer.MAX_EXPONENT_ARGUMENT, label="Clamp exponent")
+        chain.step('MINIMUM', MAX_EXPONENT_ARGUMENT, label="Clamp exponent")
         chain.step_unary('EXPONENT', label="exp")
         chain.step('SUBTRACT', props.f, socket_index=0, label="- F")
         # F > 1 admits a zero denominator so keep it one-sided.
         # this takes max(F, 1e-6) to avoid underflow of the denominator
-        chain.step('MAXIMUM', 1e-6, label="Guard denominator")
+        chain.step('MAXIMUM', UNDERFLOW_GUARD, label="Guard denominator")
         # R / denominator, with R in input 0.
         chain.step('DIVIDE', props.r, socket_index=1, label="R / denom")
         return chain.step('ADD', props.o, socket_index=0, label="+ O")

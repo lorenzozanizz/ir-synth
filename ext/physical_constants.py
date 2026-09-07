@@ -25,3 +25,11 @@ FIRST_RADIATION_CONSTANT_W_M2 = 3.741823e-16
 MIN_TRANSFER_TEMPERATURE_K = 1.0
 
 STEFAN_BOLTZMANN_CONSTANT_W_ = 5.67032e-8
+
+
+# ------------------------ Numerical constants ------------------------
+
+# Maximum exponent computed to avoid overflowing to np.inf
+MAX_EXPONENT_ARGUMENT = 80
+# Minimum value taken into consideration, any smaller value gets clipped to the guard
+UNDERFLOW_GUARD = 1e-6
