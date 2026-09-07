@@ -9,10 +9,14 @@ from typing import Optional
 from bpy.types import PropertyGroup, UILayout
 import bpy
 
-from ..thermal_core.contracts import EnvironmentSpecType
-from ..thermal_core.specs import EnvironmentFactorSpec, AmbientTemperatureSpec
+from ..thermal_core.contracts import EnvironmentSpecType, InitType
+from ..thermal_core.specs import (
+    EnvironmentFactorSpec, AmbientTemperatureSpec, DefaultInitializationSpec,
+)
 from ..thermal_core.temperature import TempUnit, Conversions
-from .properties import EnvironmentAmbientTemperatureProperties
+from .properties import (
+    EnvironmentAmbientTemperatureProperties, EnvironmentDefaultInitProperties,
+)
 
 
 class EnvironmentFactorDescriptor(ABC):
@@ -82,14 +86,66 @@ class AmbientTemperatureDescriptor(EnvironmentFactorDescriptor):
         return AmbientTemperatureSpec(value_k=Conversions.to_kelvin(props.value, unit))
 
 
-class EnvSearch:
+
+@EnvironmentFactorRegistry.register(factor_type=EnvironmentSpecType.DEFAULT_INITIALIZATION)
+class DefaultInitializationDescriptor(EnvironmentFactorDescriptor):
+    """ The scene-wide fallback initialization strategy.
+
+    Draws and builds by delegating to InitStrategyRegistry, so any strategy
+    legal at SpecScope.SCENE works here without a second implementation.
+    """
+
+    factor_type = EnvironmentSpecType.DEFAULT_INITIALIZATION
+    property_group = EnvironmentDefaultInitProperties
+    attr_name = "default_initialization"
 
     @staticmethod
-    def search(spec_type: EnvironmentSpecType) -> Optional[EnvironmentFactorDescriptor]:
-        """ Search for the existence of a configuration in the environment properties """
+    def draw(layout: UILayout, props: EnvironmentDefaultInitProperties) -> None:
+        # Imported here: init_registry imports this module, so a module-level
+        # import would be circular.
+        from .init_registry import InitStrategyRegistry
+
+        strategy_props = props.init
+        layout.prop(strategy_props, "init_type")
+
+        init_type = InitType[strategy_props.init_type]
+        try:
+            descriptor = InitStrategyRegistry.get_strategy(init_type)
+        except NotImplementedError:
+            layout.label(text=f'"{init_type.value}" is not implemented yet', icon='ERROR')
+            return
+        descriptor.draw(layout, getattr(strategy_props, descriptor.attr_name))
+
+    @staticmethod
+    def build(props: EnvironmentDefaultInitProperties) -> DefaultInitializationSpec:
+        from .init_registry import InitStrategyRegistry
+
+        strategy_props = props.init
+        descriptor = InitStrategyRegistry.get_strategy(InitType[strategy_props.init_type])
+        return DefaultInitializationSpec(
+            init_spec=descriptor.build(getattr(strategy_props, descriptor.attr_name))
+        )
+
+
+class EnvSearch:
+    """ Lookup of a configured factor on the active scene's factor stack. """
+
+    @staticmethod
+    def find(spec_type: EnvironmentSpecType):
+        """ The (descriptor, live props) pair for a configured factor, or None
+        if the scene has no entry of that type. """
         for item in bpy.context.scene.thermal_environment.factors:
             if EnvironmentSpecType[item.factor_type] is not spec_type:
                 continue
             descriptor = EnvironmentFactorRegistry.get(spec_type)
-            return descriptor
+            return descriptor, getattr(item, descriptor.attr_name)
         return None
+
+    @staticmethod
+    def build(spec_type: EnvironmentSpecType) -> Optional[EnvironmentFactorSpec]:
+        """ The built spec for a configured factor, or None if absent. """
+        found = EnvSearch.find(spec_type)
+        if found is None:
+            return None
+        descriptor, props = found
+        return descriptor.build(props)

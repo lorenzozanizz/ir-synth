@@ -7,6 +7,9 @@ class SpecScope(Enum):
     """ Where a temperature init spec is being attached/resolved. """
     OBJECT = "Object"
     COLLECTION = "Collection"
+    # The root of the inheritance chain implemented as an
+    # entry of the environmental factor stack
+    SCENE = "Scene"
 
 
 class InitType(Enum):
@@ -22,9 +25,9 @@ class InitType(Enum):
     INHERIT = "Inherit"
 
 
-    GRADIENT = "Gradient"
     UNIFORM = "Uniform"
     AMBIENT = "Ambient"
+    GRADIENT = "Gradient"
     WEIGHT_PAINTED = "Weight Painted"
 
     @staticmethod
@@ -34,6 +37,12 @@ class InitType(Enum):
             return _ALL_INITIALIZATION_STRATEGIES
         if scope is SpecScope.COLLECTION:
             return tuple(m for m in _ALL_INITIALIZATION_STRATEGIES if m not in _OBJECT_ONLY_STRATS)
+        if scope is SpecScope.SCENE:
+            # Nothing sits above the scene, so INHERIT is not allowed.
+            return tuple(
+                m for m in _ALL_INITIALIZATION_STRATEGIES
+                if m not in _OBJECT_ONLY_STRATS and m is not InitType.INHERIT
+            )
         raise ValueError(f"Unknown scope: {scope}")
 
 
@@ -51,18 +60,18 @@ class EnvironmentSpecType(Enum):
     """
     AMBIENT_TEMPERATURE = "Ambient Temperature"
     HUMIDITY = "Humidity"
+    # The scene default strategy used by objects that resolve to
+    # INHERIT and have no containing collection offering a concrete strategy
+    DEFAULT_INITIALIZATION = "Default Initialization"
 
 class ScopeMode(Enum):
     """ How a field operation picks the objects it acts on. """
 
     # Every object present in the bake.
     ALL = "All Objects"
-    # Every object belonging to a named collection. The preferred way to name
-    # a set: it survives renames of its members and a hook can populate it.
+    # Every object belonging to a named collection.
     COLLECTION = "Collection"
-    # An explicit list of object keys. Needed because the per-object "add an
-    # operation for this object" shortcut has to scope to exactly one object
-    # without inventing a collection for it.
+    # An explicit list of object keys.
     OBJECTS = "Objects"
 
 

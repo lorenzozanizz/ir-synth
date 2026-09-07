@@ -131,60 +131,20 @@ class WeightPaintedTempProperties(PropertyGroup):
     )
 
 
-class EnvironmentAmbientTemperatureProperties(PropertyGroup):
-    """ UI state for EnvironmentSpecType.AMBIENT_TEMPERATURE: the air
-    temperature surrounding the whole scene, used for convective/radiative
-    exchange with the environment.
-
-    """
-    value: FloatProperty(                                               # type: ignore
-        name="Temperature",
-        description="Ambient air temperature surrounding the scene",
-        default=293.15,  # 20C in Kelvin, stored/exposed per `unit` below
-        soft_min=0.0,
-    )
-    unit: EnumProperty(                                                 # type: ignore
-        name="Unit",
-        description="Display unit for the temperature value above",
-        items=[(u.name, u.value, "") for u in TempUnit],
-        default=TempUnit.KELVIN.name,
-    )
-
-
-class EnvironmentFactorItem(PropertyGroup):
-    """ One active entry in the scene's environmental-factor stack: which
-    factor it is, and its parameters.
-
-    """
-    factor_type: EnumProperty(                                                      # type: ignore
-        name="Factor",
-        description="Which environmental condition this entry configures",
-        items=[(f.name, f.value, "") for f in EnvironmentSpecType],
-        default=EnvironmentSpecType.AMBIENT_TEMPERATURE.name,
-    )
-    ambient_temperature: PointerProperty(type=EnvironmentAmbientTemperatureProperties)  # type: ignore
-
-
-class EnvironmentSettings(PropertyGroup):
-    """ Scene-level stack of active environmental factors (see
-    EnvironmentFactorItem above).
-
-    """
-    factors: CollectionProperty(type=EnvironmentFactorItem)                         # type: ignore
-    active_index: IntProperty(                                                      # type: ignore
-        name="Active Environmental Factor",
-        description="Index of the selected entry in the list above, used by "
-                    "the add/remove operators",
-        default=0,
-    )
-
-
 # Needs to be declared at module level statically and cannot be put inside InitStrategyProperties due
 # to blender registration requiring it
+def _scope_for(owner) -> SpecScope:
+    """ The scope implied by the ID datablock an InitStrategyProperties hangs off. """
+    if isinstance(owner, Collection):
+        return SpecScope.COLLECTION
+    if isinstance(owner, Scene):
+        return SpecScope.SCENE
+    return SpecScope.OBJECT
+
+
 def _init_type_items(self, _):
-    """ Determines scope (Object vs Collection) """
-    scope = SpecScope.COLLECTION if isinstance(self.id_data, Collection) else SpecScope.OBJECT
-    return STRATEGIES_BY_SCOPE.get(scope)
+    """ Determines scope (Object vs Collection vs Scene) """
+    return STRATEGIES_BY_SCOPE.get(_scope_for(self.id_data))
 
 # Depending on the scope of the declaration (object or collection or something TBD)
 # different strategies are available.
@@ -208,6 +168,67 @@ class InitStrategyProperties(PropertyGroup):
     ambient: PointerProperty(type=AmbientTempProperties)                        # type: ignore
     gradient: PointerProperty(type=GradientTempProperties)                      # type: ignore
     weight_painted: PointerProperty(type=WeightPaintedTempProperties)           # type: ignore
+
+
+class EnvironmentAmbientTemperatureProperties(PropertyGroup):
+    """ UI state for EnvironmentSpecType.AMBIENT_TEMPERATURE: the air
+    temperature surrounding the whole scene, used for convective/radiative
+    exchange with the environment.
+
+    """
+    value: FloatProperty(                                               # type: ignore
+        name="Temperature",
+        description="Ambient air temperature surrounding the scene",
+        default=293.15,  # 20C in Kelvin, stored/exposed per `unit` below
+        soft_min=0.0,
+    )
+    unit: EnumProperty(                                                 # type: ignore
+        name="Unit",
+        description="Display unit for the temperature value above",
+        items=[(u.name, u.value, "") for u in TempUnit],
+        default=TempUnit.KELVIN.name,
+    )
+
+
+class EnvironmentDefaultInitProperties(PropertyGroup):
+    """ UI state for EnvironmentSpecType.DEFAULT_INITIALIZATION: the strategy
+    an object falls back to when it resolves to INHERIT and no containing
+    collection offers a concrete one.
+
+    Reuses InitStrategyProperties rather than redeclaring parameters. Because
+    its owning ID datablock is the Scene, _init_type_items offers only the
+    strategies legal at SpecScope.SCENE.
+    """
+    init: PointerProperty(type=InitStrategyProperties)                                 # type: ignore
+
+
+class EnvironmentFactorItem(PropertyGroup):
+    """ One active entry in the scene's environmental-factor stack: which
+    factor it is, and its parameters.
+
+    """
+    factor_type: EnumProperty(                                                      # type: ignore
+        name="Factor",
+        description="Which environmental condition this entry configures",
+        items=[(f.name, f.value, "") for f in EnvironmentSpecType],
+        default=EnvironmentSpecType.AMBIENT_TEMPERATURE.name,
+    )
+    ambient_temperature: PointerProperty(type=EnvironmentAmbientTemperatureProperties)  # type: ignore
+    default_initialization: PointerProperty(type=EnvironmentDefaultInitProperties)      # type: ignore
+
+
+class EnvironmentSettings(PropertyGroup):
+    """ Scene-level stack of active environmental factors (see
+    EnvironmentFactorItem above).
+
+    """
+    factors: CollectionProperty(type=EnvironmentFactorItem)                         # type: ignore
+    active_index: IntProperty(                                                      # type: ignore
+        name="Active Environmental Factor",
+        description="Index of the selected entry in the list above, used by "
+                    "the add/remove operators",
+        default=0,
+    )
 
 
 class ThermalProperties(PropertyGroup):

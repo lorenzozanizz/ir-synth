@@ -8,7 +8,7 @@ from typing import Type
 from abc import ABC, abstractmethod
 
 import bpy
-from bpy.types import PropertyGroup, UILayout, Object
+from bpy.types import PropertyGroup, UILayout, Object, Collection
 
 from ..thermal_core.contracts import InitType, SpecScope, EnvironmentSpecType
 from ..thermal_core.specs import (
@@ -20,7 +20,7 @@ from .properties import (
     AmbientTempProperties, GradientTempProperties, UniformTempProperties, WeightPaintedTempProperties,
 )
 from .text_wrap_utils import WrapWidget
-from .environment_registry import EnvironmentFactorRegistry, EnvSearch
+from .environment_registry import EnvSearch
 
 
 class StrategyDescriptor(ABC):
@@ -122,30 +122,22 @@ class InitAmbient(StrategyDescriptor):
     @staticmethod
     def draw(layout: UILayout, props: AmbientTempProperties) -> None:
         # If the ambient temperature is not set, this cannot be used.
-        if EnvSearch.search(EnvironmentSpecType.AMBIENT_TEMPERATURE) is None:
+        if EnvSearch.find(EnvironmentSpecType.AMBIENT_TEMPERATURE) is None:
             WrapWidget.draw(layout, bpy.context, "This initialization requires to configure "
-                "the ambient temperature scene property", "warning_large")
+                "the ambient temperature scene property", "ERROR")
 
     @staticmethod
     def build(props: AmbientTempProperties) -> AmbientTempSpec:
-        return AmbientTempSpec(value_k=InitAmbient._resolve_scene_ambient_temperature())
-
-    @staticmethod
-    def _resolve_scene_ambient_temperature() -> float:
         """ AMBIENT reads its value from the scene's environmental-factor
         stack (Scene Properties > Thermal Environment) rather than from its
         own props, so every object/collection resolving to AMBIENT shares
         one single source of truth instead of each carrying its own copy.
         """
-        for item in bpy.context.scene.thermal_environment.factors:
-            if EnvironmentSpecType[item.factor_type] is not EnvironmentSpecType.AMBIENT_TEMPERATURE:
-                continue
-            descriptor = EnvironmentFactorRegistry.get(EnvironmentSpecType.AMBIENT_TEMPERATURE)
-            sub_props = getattr(item, descriptor.attr_name)
-            return descriptor.build(sub_props).value_k
-        # An invalid kelvin value, will fail when calling validate()
-        raise ValueError("No Ambient Temperature factor is configured in Scene Properties > "
-                         "Thermal Environment.")
+        spec = EnvSearch.build(EnvironmentSpecType.AMBIENT_TEMPERATURE)
+        if spec is None:
+            raise ValueError("No Ambient Temperature factor is configured in Scene Properties > "
+                             "Thermal Environment.")
+        return AmbientTempSpec(value_k=spec.value_k)
 
 @InitStrategyRegistry.register(init_type=InitType.GRADIENT)
 class InitGradient(StrategyDescriptor):
@@ -161,6 +153,17 @@ class InitGradient(StrategyDescriptor):
     @staticmethod
     def draw(layout: UILayout, props: GradientTempProperties) -> None:
         target = props.id_data
+
+        # At SCENE scope the owner is the Scene itself, which the cursor and
+        # overlay operators cannot address, so those buttons are omitted.
+        if not isinstance(target, (Object, Collection)):
+            layout.prop(props, "point_a")
+            layout.prop(props, "value_a")
+            layout.prop(props, "point_b")
+            layout.prop(props, "value_b")
+            layout.prop(props, "unit")
+            return
+
         target_type = 'OBJECT' if isinstance(target, Object) else 'COLLECTION'
 
         row_a = layout.row(align=True)

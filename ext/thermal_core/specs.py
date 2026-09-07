@@ -197,6 +197,20 @@ class AmbientTemperatureSpec(EnvironmentFactorSpec):
             raise ValueError(f"AmbientTemperatureSpec.value_k ({self.value_k}K) is below absolute zero")
 
 
+@dataclass(frozen=True)
+class DefaultInitializationSpec(EnvironmentFactorSpec):
+    """ The default initialization strategy. Contains a TempInitSpec to
+    hold an arbitrary temperature initialization specification"""
+    init_spec: TempInitSpec
+
+    @property
+    def factor_type(self) -> EnvironmentSpecType:
+        return EnvironmentSpecType.DEFAULT_INITIALIZATION
+
+    def validate(self) -> None:
+        self.init_spec.validate()
+
+
 @dataclass
 class ThermalProfile:
     """ Holds a complete profile: how an object's temperature is initialized,
