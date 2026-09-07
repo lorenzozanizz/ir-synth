@@ -16,12 +16,16 @@ class InitType(Enum):
     WEIGHT_PAINTED depends on per-vertex data (a vertex group) that only exists on a
     mesh Object, so it can never be used as a Collection-level default.
     """
+    # Keep this as the first attribute. Any object that does not have a set value
+    # will inherit from something above it, eventually a
+    # scene default value.
+    INHERIT = "Inherit"
+
 
     GRADIENT = "Gradient"
     UNIFORM = "Uniform"
     AMBIENT = "Ambient"
     WEIGHT_PAINTED = "Weight Painted"
-    INHERIT = "Inherit"
 
     @staticmethod
     def allowed_for_scope(scope: SpecScope) -> tuple:

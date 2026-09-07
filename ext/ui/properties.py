@@ -184,8 +184,14 @@ class EnvironmentSettings(PropertyGroup):
 def _init_type_items(self, _):
     """ Determines scope (Object vs Collection) """
     scope = SpecScope.COLLECTION if isinstance(self.id_data, Collection) else SpecScope.OBJECT
-    return [(m.name, m.value, "") for m in InitType.allowed_for_scope(scope)]
+    return STRATEGIES_BY_SCOPE.get(scope)
 
+# Depending on the scope of the declaration (object or collection or something TBD)
+# different strategies are available.
+STRATEGIES_BY_SCOPE = {
+    scope: [(m.name, m.value, "") for m in InitType.allowed_for_scope(scope)]
+    for scope in SpecScope
+}
 
 class InitStrategyProperties(PropertyGroup):
     """ "Which strategy, and its parameters" container, attached to both
