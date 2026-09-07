@@ -30,14 +30,19 @@ class ShaderDescriptor(ABC):
 
         :param settings: the scene's ThermalRenderSettings.
         """
-        pass
 
 
 class ShaderRegistry:
+    """ The registry containing the strategy to emit each shaded material /
+    rendered image starting from the ideal black body emittance computed by the
+    transfer. """
+
+
     _REGISTRY: Dict[ShadingType, Type[ShaderDescriptor]] = {}
 
     @classmethod
     def register(cls, shading_type: ShadingType):
+        """ Register a shader """
         def decorator(descriptor: Type[ShaderDescriptor]) -> Type[ShaderDescriptor]:
             cls._REGISTRY[shading_type] = descriptor
             return descriptor
@@ -55,10 +60,12 @@ class ShaderRegistry:
 
     @staticmethod
     def implemented() -> Tuple[ShadingType, ...]:
+        """ Obtain the implemented shaders """
         return tuple(ShaderRegistry._REGISTRY)
 
     @staticmethod
     def is_implemented(shading_type: ShadingType) -> bool:
+        """ Check if a shader is implemented """
         return shading_type in ShaderRegistry._REGISTRY
 
 
@@ -89,6 +96,7 @@ class TemperatureShader(ShaderDescriptor):
 
     @staticmethod
     def build(material: Material, settings: PropertyGroup) -> None:
+        """ Build the shader tree for the pure temperature shader """
         tree = _prepare_tree(material)
         temperature = TreeUtils.new_attribute(tree, TEMPERATURE_ATTR_NAME, _ATTRIBUTE_LOCATION)
         build_terminal(

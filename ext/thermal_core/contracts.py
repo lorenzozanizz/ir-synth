@@ -1,3 +1,6 @@
+""" The module containing all basic enums/ contracts between the pure-bpy
+part of the code and the bpy-free part of the code, which will be hooked later
+and which will be tested. """
 from enum import Enum
 from dataclasses import dataclass
 
