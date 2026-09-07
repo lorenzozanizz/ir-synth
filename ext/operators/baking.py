@@ -224,7 +224,7 @@ class SceneBakeRunner:
         }
 
         # 1. bpy -> config
-        config, unresolved = ConfigBuilder.from_scene(scene)
+        config, unresolved, invalid = ConfigBuilder.from_scene(scene)
         outcomes: dict[str, BakeOutcome] = {
             key: BakeOutcome.SKIPPED_UNRESOLVED for key in unresolved
         }

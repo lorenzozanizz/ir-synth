@@ -22,6 +22,7 @@ if "bpy" not in sys.modules:
     class Panel:
         pass
 
+
     class NodeTree:
         pass
 

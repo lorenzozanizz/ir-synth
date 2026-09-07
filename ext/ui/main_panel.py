@@ -40,33 +40,27 @@ class BakeSection(UISection):
     """
 
     @staticmethod
-    def _count_ready(context: Context) -> tuple[int, int]:
+    def _count_ready(context: Context) -> tuple[int, int, int, int]:
         """ How many mesh objects would produce a field, out of how many exist.
 
         Counts through ConfigBuilder rather than resolving each object here, so
         the panel and the bake can never disagree about what is ready.
         """
         total_mesh = len(ConfigBuilder.mesh_objects(context.scene))
-        config, _unresolved = ConfigBuilder.from_scene(context.scene)
+        config, unresolved, invalid = ConfigBuilder.from_scene(context.scene)
 
-        ready = 0
-        for spec in config.sources.values():
-            try:
-                spec.validate()
-            except ValueError:
-                continue
-            ready += 1
-        return ready, total_mesh
+        return len(config.sources), len(unresolved), len(invalid), total_mesh
+
 
 
     def draw(self, context: Context, layout) -> None:
-        ready, total_mesh = self._count_ready(context)
+        ready, unresolved, invalid, total_mesh = self._count_ready(context)
 
         if total_mesh == 0:
             layout.label(text="No mesh objects in scene", icon='INFO')
         else:
             layout.label(
-                text=f"{ready}/{total_mesh} mesh object(s) ready to bake",
+                text=f"{ready}/{total_mesh} mesh object(s) ready to bake ({unresolved} unresolved, {invalid} invalid)",
                 icon='CHECKMARK' if ready == total_mesh else 'INFO',
             )
 

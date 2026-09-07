@@ -174,7 +174,7 @@ class ConfigBuilder:
     @staticmethod
     def from_objects(
         objects: Iterable[Object],
-    ) -> Tuple[SceneThermalConfig, Dict[ObjectKey, Exception]]:
+    ) -> Tuple[SceneThermalConfig, Dict[ObjectKey, Exception], Dict[ObjectKey, Exception]]:
         """ Resolve each object's effective spec into a config.
 
         Objects whose spec cannot be resolved are left out of the config and
@@ -186,18 +186,23 @@ class ConfigBuilder:
         # Basically, just iterate all objects and resolve for each its spec.
         sources: Dict[ObjectKey, TempInitSpec] = {}
         unresolved: Dict[ObjectKey, Exception] = {}
+        invalid: Dict[ObjectKey, Exception] = {}
 
         for obj in objects:
             key = ConfigBuilder.object_key(obj)
             try:
-                sources[key] = SpecsResolver.resolve_object_spec(obj)
+                sources[key] = spec = SpecsResolver.resolve_object_spec(obj)
+                spec.validate()
             except (SpecResolutionError, NotImplementedError) as error:
                 unresolved[key] = error
+            except ValueError as validation_error:
+                # Keep track of invalid objects
+                invalid[key] = validation_error
 
-        return SceneThermalConfig(sources=sources), unresolved
+        return SceneThermalConfig(sources=sources), unresolved, invalid
 
     @staticmethod
-    def from_scene(scene) -> Tuple[SceneThermalConfig, Dict[ObjectKey, Exception]]:
+    def from_scene(scene) -> Tuple[SceneThermalConfig, Dict[ObjectKey, Exception], Dict[ObjectKey, Exception]]:
         """ The complete config: every mesh object's source, plus the scene's
         operation stack.
 
@@ -206,8 +211,8 @@ class ConfigBuilder:
         """
         from .op_registry import OperationRegistry
 
-        config, unresolved = ConfigBuilder.from_objects(ConfigBuilder.mesh_objects(scene))
+        config, unresolved, invalid = ConfigBuilder.from_objects(ConfigBuilder.mesh_objects(scene))
         stack = getattr(scene, "thermal_stack", None)
         if stack is None:
-            return config, unresolved
-        return config.with_operations(OperationRegistry.build_stack(stack)), unresolved
+            return config, unresolved, invalid
+        return config.with_operations(OperationRegistry.build_stack(stack)), unresolved, invalid

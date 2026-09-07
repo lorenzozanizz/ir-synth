@@ -144,7 +144,8 @@ class InitAmbient(StrategyDescriptor):
             sub_props = getattr(item, descriptor.attr_name)
             return descriptor.build(sub_props).value_k
         # An invalid kelvin value, will fail when calling validate()
-        return -1
+        raise ValueError("No Ambient Temperature factor is configured in Scene Properties > "
+                         "Thermal Environment.")
 
 @InitStrategyRegistry.register(init_type=InitType.GRADIENT)
 class InitGradient(StrategyDescriptor):
