@@ -15,6 +15,8 @@ Blender already gives the user a full 3D pipeline with geometry, materials, came
 
 Generating a thermal image with IR-synth usually follows a simple procedure:
 
+![Temperature map](./resources/teapot.png)
+
 **1. Set an initial temperature field.** You start by defining the temperature distribution across your scene, either by hand (assigning values to objects or regions) or programmatically, driving it from a script, a heat simulation, or an external dataset.
 
 **2. Set environment features (optional).** On top of the base temperature field, you can layer in things like emissivity per material or surface, ambient humidity, and ambient temperature. These affect how heat is emitted and perceived, and skipping them just falls back to simpler assumptions or default values depending on the rendering model, see below.
