@@ -8,7 +8,7 @@ from typing import Type
 from abc import ABC, abstractmethod
 
 import bpy
-from bpy.types import PropertyGroup, UILayout, Object
+from bpy.types import PropertyGroup, UILayout, Object, Collection
 
 from ..thermal_core.contracts import InitType, SpecScope, EnvironmentSpecType
 from ..thermal_core.specs import (
@@ -20,7 +20,7 @@ from .properties import (
     AmbientTempProperties, GradientTempProperties, UniformTempProperties, WeightPaintedTempProperties,
 )
 from .text_wrap_utils import WrapWidget
-from .environment_registry import EnvironmentFactorRegistry, EnvSearch
+from .environment_registry import EnvSearch
 
 
 class StrategyDescriptor(ABC):
@@ -99,9 +99,9 @@ class InitWeightUniform(StrategyDescriptor):
     attr_name = "uniform"
 
     @staticmethod
-    def draw(layout: UILayout, props: UniformTempProperties) -> None:
-        layout.prop(props, "value")
-        layout.prop(props, "unit")
+    def draw(ui_layout: UILayout, props: UniformTempProperties) -> None:
+        ui_layout.prop(props, "value")
+        ui_layout.prop(props, "unit")
 
     @staticmethod
     def build(props: UniformTempProperties) -> UniformTempSpec:
@@ -120,32 +120,24 @@ class InitAmbient(StrategyDescriptor):
     attr_name = "ambient"
 
     @staticmethod
-    def draw(layout: UILayout, props: AmbientTempProperties) -> None:
+    def draw(ui_layout: UILayout, props: AmbientTempProperties) -> None:
         # If the ambient temperature is not set, this cannot be used.
-        if EnvSearch.search(EnvironmentSpecType.AMBIENT_TEMPERATURE) is None:
-            WrapWidget.draw(layout, bpy.context, "This initialization requires to configure "
-                "the ambient temperature scene property", "warning_large")
+        if EnvSearch.find(EnvironmentSpecType.AMBIENT_TEMPERATURE) is None:
+            WrapWidget.draw(ui_layout, bpy.context, "This initialization requires to configure "
+                "the ambient temperature scene property", "ERROR")
 
     @staticmethod
     def build(props: AmbientTempProperties) -> AmbientTempSpec:
-        return AmbientTempSpec(value_k=InitAmbient._resolve_scene_ambient_temperature())
-
-    @staticmethod
-    def _resolve_scene_ambient_temperature() -> float:
         """ AMBIENT reads its value from the scene's environmental-factor
         stack (Scene Properties > Thermal Environment) rather than from its
         own props, so every object/collection resolving to AMBIENT shares
         one single source of truth instead of each carrying its own copy.
         """
-        for item in bpy.context.scene.thermal_environment.factors:
-            if EnvironmentSpecType[item.factor_type] is not EnvironmentSpecType.AMBIENT_TEMPERATURE:
-                continue
-            descriptor = EnvironmentFactorRegistry.get(EnvironmentSpecType.AMBIENT_TEMPERATURE)
-            sub_props = getattr(item, descriptor.attr_name)
-            return descriptor.build(sub_props).value_k
-        # An invalid kelvin value, will fail when calling validate()
-        raise ValueError("No Ambient Temperature factor is configured in Scene Properties > "
-                         "Thermal Environment.")
+        spec = EnvSearch.build(EnvironmentSpecType.AMBIENT_TEMPERATURE)
+        if spec is None:
+            raise ValueError("No Ambient Temperature factor is configured in Scene Properties > "
+                             "Thermal Environment.")
+        return AmbientTempSpec(value_k=spec.value_k)
 
 @InitStrategyRegistry.register(init_type=InitType.GRADIENT)
 class InitGradient(StrategyDescriptor):
@@ -159,29 +151,40 @@ class InitGradient(StrategyDescriptor):
     attr_name = "gradient"
 
     @staticmethod
-    def draw(layout: UILayout, props: GradientTempProperties) -> None:
+    def draw(ui_layout: UILayout, props: GradientTempProperties) -> None:
         target = props.id_data
+
+        # At SCENE scope the owner is the Scene itself, which the cursor and
+        # overlay operators cannot address, so those buttons are omitted.
+        if not isinstance(target, (Object, Collection)):
+            ui_layout.prop(props, "point_a")
+            ui_layout.prop(props, "value_a")
+            ui_layout.prop(props, "point_b")
+            ui_layout.prop(props, "value_b")
+            ui_layout.prop(props, "unit")
+            return
+
         target_type = 'OBJECT' if isinstance(target, Object) else 'COLLECTION'
 
-        row_a = layout.row(align=True)
+        row_a = ui_layout.row(align=True)
         row_a.prop(props, "point_a")
         op = row_a.operator(
             Labels.GRADIENT_POINT_FROM_CURSOR.value, text="", icon='CURSOR',
         )
         op.target_type, op.target_name, op.point = target_type, target.name, 'A'
-        layout.prop(props, "value_a")
+        ui_layout.prop(props, "value_a")
 
-        row_b = layout.row(align=True)
+        row_b = ui_layout.row(align=True)
         row_b.prop(props, "point_b")
         op = row_b.operator(
             Labels.GRADIENT_POINT_FROM_CURSOR.value, text="", icon='CURSOR',
         )
         op.target_type, op.target_name, op.point = target_type, target.name, 'B'
-        layout.prop(props, "value_b")
+        ui_layout.prop(props, "value_b")
 
-        layout.prop(props, "unit")
+        ui_layout.prop(props, "unit")
 
-        op = layout.operator(
+        op = ui_layout.operator(
             Labels.VISUALIZE_GRADIENT_POINTS.value, icon='SHADING_WIRE',
         )
         op.target_type, op.target_name = target_type, target.name
@@ -205,20 +208,20 @@ class InitWeightPainted(StrategyDescriptor):
     attr_name = "weight_painted"
 
     @staticmethod
-    def draw(layout: UILayout, props: WeightPaintedTempProperties) -> None:
+    def draw(ui_layout: UILayout, props: WeightPaintedTempProperties) -> None:
         # WEIGHT_PAINTED is Object-only, so props.id_data is normally an Object.
         # prop_search() renders a searchable dropdown against that object's
         # actual vertex groups instead of a string field, so a typo
         # or stale name can no longer be entered
         target = props.id_data
         if isinstance(target, Object) and target.type == 'MESH':
-            layout.prop_search(props, "vertex_group", target, "vertex_groups")
+            ui_layout.prop_search(props, "vertex_group", target, "vertex_groups")
         else:
-            layout.prop(props, "vertex_group")
-        layout.prop(props, "min_value")
-        layout.prop(props, "max_value")
-        layout.prop(props, "unit")
-        layout.prop(props, "falloff")
+            ui_layout.prop(props, "vertex_group")
+        ui_layout.prop(props, "min_value")
+        ui_layout.prop(props, "max_value")
+        ui_layout.prop(props, "unit")
+        ui_layout.prop(props, "falloff")
 
     @staticmethod
     def build(props: WeightPaintedTempProperties) -> WeightPaintedTempSpec:

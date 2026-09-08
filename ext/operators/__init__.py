@@ -1,3 +1,12 @@
+""" A module containing all operators which the Blender interface
+calls. The operators use both UI elements and elements of the BPY-free
+backend.
+
+Any hook that will be implemented will make use of some of the infrastructure
+in this module.
+"""
+
+
 from .baking import BakeTemperatureOperator
 from .visualization import (VisualizeTemperatureOperator, FitDisplaySpanOperator,
                             ShowColorBarOperator, HideColorBarOperator)
@@ -16,7 +25,7 @@ classes = (
     AddEnvironmentFactorOperator,
     AddOperationOperator, RemoveOperationOperator, MoveOperationOperator,
     DuplicateOperationOperator, IsolateOperationOperator,
-    AddScopeObjectOperator, RemoveScopeObjectOperator,  
+    AddScopeObjectOperator, RemoveScopeObjectOperator,
     RemoveEnvironmentFactorOperator,
     SetGradientPointFromCursorOperator,
     VisualizeGradientPointsOperator,

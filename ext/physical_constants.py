@@ -11,7 +11,7 @@ raw temperature map imposed on the scene as an initial state.
 SECOND_RADIATION_CONSTANT_MK = 1.4387768775e-2
 
 # \cite{waldermar_et_dudzik} taken from the "Symbols" section.
-TECHNICAL_CONSTANT_BB_RAD_W_mm2_KM4 = 5.67032
+TECHNICAL_CONSTANT_BB_RAD_W_MM2_KM4 = 5.67032
 
 SPEED_OF_LIGHT_VACUUM_M_SM1 = 299792458
 

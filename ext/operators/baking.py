@@ -14,7 +14,7 @@ own and reuses the rest unchanged.
 """
 
 from enum import Enum, auto
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 from bpy.types import Operator, Object
@@ -225,7 +225,7 @@ class SceneBakeRunner:
 
         # 1. bpy -> config
         config, unresolved, invalid = ConfigBuilder.from_scene(scene)
-        outcomes: dict[str, BakeOutcome] = {
+        outcomes: Dict[str, BakeOutcome] = {
             key: BakeOutcome.SKIPPED_UNRESOLVED for key in unresolved
         }
         # 2. bpy -> geometry

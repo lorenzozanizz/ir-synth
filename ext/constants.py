@@ -1,3 +1,7 @@
+""" A module containing thermal constants which
+are shared among components in the entire project.
+"""
+
 MAIN_PANEL_NAME = "Thermography"
 VERSION = "0.9.0"
 TARGET_VERSION = "4.5.0"

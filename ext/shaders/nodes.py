@@ -14,6 +14,9 @@ from bpy.types import Node, NodeSocket, ShaderNodeTree
 Operand = Union[float, NodeSocket]
 
 class TreeUtils:
+    """ A set of utility functions to manipulate and generate
+    math compositor trees. """
+
 
     @staticmethod
     def feed(tree: ShaderNodeTree, socket_input, operand: Operand) -> None:

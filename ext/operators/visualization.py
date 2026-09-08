@@ -131,7 +131,8 @@ class FitDisplaySpanOperator(Operator):
             self.report({'WARNING'}, "No baked temperature data found, run Bake first")
             return {'CANCELLED'}
 
-        combined = np.concatenate([FitDisplaySpanOperator._read_temperature_values(obj) for obj in objects])
+        combined = np.concatenate([FitDisplaySpanOperator._read_temperature_values(obj)
+                                   for obj in objects])
         min_k, max_k = float(combined.min()), float(combined.max())
 
         if max_k - min_k < 1e-3:

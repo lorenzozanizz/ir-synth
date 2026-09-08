@@ -27,6 +27,7 @@ from .properties import (
     ThermalProperties,
     ThermalRenderSettings,
     EnvironmentAmbientTemperatureProperties,
+    EnvironmentDefaultInitProperties,
     EnvironmentFactorItem,
     EnvironmentSettings,
 )
@@ -48,6 +49,7 @@ classes = (
     ThermalProperties,
     ThermalRenderSettings,
     EnvironmentAmbientTemperatureProperties,
+    EnvironmentDefaultInitProperties,
     EnvironmentFactorItem,
     EnvironmentSettings,
     ObjectRefProperties,

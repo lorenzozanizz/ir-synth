@@ -8,7 +8,7 @@ directly.
 Chain walked for an object set to INHERIT:
     Object (if not INHERIT)
       -> Object's Collection(s) (if not INHERIT)
-        -> Scene default (not yet implemented - see module note below)
+        -> Scene default (EnvironmentSpecType.DEFAULT_INITIALIZATION, if present)
 
 """
 
@@ -17,10 +17,11 @@ from typing import Dict, Iterable, List, Tuple
 from bpy.types import Object, Collection
 
 from ..thermal_core.config import SceneThermalConfig
-from ..thermal_core.contracts import InitType, SpecScope
+from ..thermal_core.contracts import InitType, SpecScope, EnvironmentSpecType
 from ..thermal_core.field import ObjectKey
 from ..thermal_core.specs import TempInitSpec
 from .init_registry import InitStrategyRegistry
+from .environment_registry import EnvSearch
 
 
 class SpecResolutionError(Exception):
@@ -119,10 +120,16 @@ class SpecsResolver:
 
         candidates = SpecsResolver._candidate_specs_from_collections(obj)
 
+        # Last link in the chain: the scene-wide default, carried as an entry of
+        # the environmental-factor stack.
         if not candidates:
+            default = EnvSearch.build(EnvironmentSpecType.DEFAULT_INITIALIZATION)
+            if default is not None:
+                return default.init_spec
             raise UnresolvedSpecError(
                 f"{obj.name!r} is set to Inherit, but no containing collection "
-                f"provides a concrete default."
+                f"provides a concrete default and the scene has no Default "
+                f"Initialization factor configured."
             )
 
         first_spec = candidates[0][1]

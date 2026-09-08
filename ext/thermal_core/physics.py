@@ -32,5 +32,3 @@ class PhysicsFunc:
     @staticmethod
     def planck_law(t: np.ndarray) -> np.ndarray:
         pass
-
-
