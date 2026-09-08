@@ -60,3 +60,19 @@ class WienTransferProperties(PropertyGroup):
         description="Additive detector offset",
         default=0.0,
     )
+
+
+class RayleighJeansTransferProperties(PropertyGroup):
+    """ UI state for TransferType.RAYLEIGH_JEANS: S = R * T + O.
+    """
+    r: FloatProperty(                                                   # type: ignore
+        name="R",
+        description="Scaling coefficient, absorbing the physical constants, "
+                    "band width and detector gain",
+        default=1.0,
+    )
+    o: FloatProperty(                                                   # type: ignore
+        name="O",
+        description="Additive detector offset",
+        default=0.0,
+    )

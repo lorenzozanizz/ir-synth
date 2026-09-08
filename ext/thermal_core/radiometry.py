@@ -252,6 +252,40 @@ class WienTransferSpec(TransferSpec):
         return self.b / np.log(self.r / above_offset)
 
 
+@dataclass(frozen=True)
+class RayleighJeansTransferSpec(TransferSpec):
+    """ Rayleigh-Jeans approximation of Planck's law, the low-frequency /
+    long-wavelength limit (opposite regime of Wien):
+
+        S(T) = R * T + O
+
+    Linear in T because the exponential in Planck's law is replaced by its
+    first-order expansion, valid where B/T << 1. Diverges from the exact
+    narrow-band form as T shrinks or the band centre moves to shorter
+    wavelengths.
+
+    :param r: scaling coefficient, absorbing the physical constants, the band
+        width and the detector gain.
+    :param o: additive detector offset (dark signal).
+    """
+    r: float
+    o: float
+
+    @property
+    def transfer_type(self) -> TransferType:
+        return TransferType.RAYLEIGH_JEANS
+
+    def validate(self) -> None:
+        """ Simple validation steps on the parameters """
+        if self.r == 0.0:
+            raise ValueError("RayleighJeansTransferSpec.r is 0, which nullifies all thermal contrast.")
+
+    def invert(self, signal: np.ndarray) -> np.ndarray:
+        """ T = (S - O) / R. """
+        signal = np.asarray(signal, dtype=np.float64)
+        return (signal - self.o) / self.r
+
+
 # Type hint
 # A function evaluating one resolved TransferSpec into a signal array of the
 # same shape as the Kelvin array handed to it.
@@ -370,3 +404,12 @@ def _evaluate_wien(spec: WienTransferSpec, temperatures_k: np.ndarray) -> np.nda
     exp(-B/T) is bounded in [0, 1) for any T > 0, no overflow guard is not needed here.
     """
     return spec.r * np.exp(-spec.b / temperatures_k) + spec.o
+
+
+@TransferRegistry.register(RayleighJeansTransferSpec)
+def _evaluate_rayleigh_jeans(spec: RayleighJeansTransferSpec, temperatures_k: np.ndarray) -> np.ndarray:
+    """ S = R * T + O, evaluated elementwise.
+
+    Linear, no overflow/underflow guard needed at any finite T.
+    """
+    return spec.r * temperatures_k + spec.o

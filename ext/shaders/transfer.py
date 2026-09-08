@@ -14,10 +14,13 @@ from bpy.types import NodeSocket, PropertyGroup, ShaderNodeTree, UILayout
 from ..physical_constants import UNDERFLOW_GUARD, MAX_EXPONENT_ARGUMENT
 from ..thermal_core.contracts import TransferType
 from ..thermal_core.radiometry import (
-    MIN_TRANSFER_TEMPERATURE_K, RBFOTransferSpec, TransferSpec, WienTransferSpec,
+    MIN_TRANSFER_TEMPERATURE_K, RayleighJeansTransferSpec, RBFOTransferSpec,
+    TransferSpec, WienTransferSpec,
 )
 from .nodes import MathCompositor
-from .properties import RBFOTransferProperties, WienTransferProperties
+from .properties import (
+    RayleighJeansTransferProperties, RBFOTransferProperties, WienTransferProperties,
+)
 
 
 
@@ -154,7 +157,9 @@ class RBFOTransfer(TransferDescriptor):
 class WienTransfer(TransferDescriptor):
     """ S = R * exp(-B/T) + O, as four Math nodes.
 
-    The Wien approximation of the narrow-band Planck form.
+    The Wien approximation of the narrow-band Planck form: same shape as
+    RBFO with F=0, but implemented as its own chain since the RBFO chain's
+    intermediate steps (guard denominator, F subtraction) don't apply here.
     """
 
     transfer_type = TransferType.WIEN
@@ -190,4 +195,39 @@ class WienTransfer(TransferDescriptor):
         chain.step_unary('EXPONENT', label="exp")
         # R * exp(-B/T), with R in input 0.
         chain.step('MULTIPLY', props.r, socket_index=0, label="R * exp")
+        return chain.step('ADD', props.o, socket_index=0, label="+ O")
+
+
+@TransferNodeRegistry.register(TransferType.RAYLEIGH_JEANS)
+class RayleighJeansTransfer(TransferDescriptor):
+    """ S = R * T + O, as two Math nodes.
+
+    Low-frequency limit of Planck's law: linear in T, no exponential stage.
+    """
+
+    transfer_type = TransferType.RAYLEIGH_JEANS
+    property_group = RayleighJeansTransferProperties
+    attr_name = "rayleigh_jeans"
+
+    @staticmethod
+    def draw(layout: UILayout, props: RayleighJeansTransferProperties) -> None:
+        column = layout.column(align=True)
+        column.prop(props, "r")
+        column.prop(props, "o")
+
+    @staticmethod
+    def build_spec(props: RayleighJeansTransferProperties) -> RayleighJeansTransferSpec:
+        return RayleighJeansTransferSpec(r=props.r, o=props.o)
+
+    @staticmethod
+    def build_nodes(
+        tree: ShaderNodeTree,
+        temperature_socket: NodeSocket,
+        props: RayleighJeansTransferProperties,
+        location: Tuple[float, float],
+    ) -> NodeSocket:
+        chain = MathCompositor(tree, location, temperature_socket)
+
+        # R * T, with R in input 0.
+        chain.step('MULTIPLY', props.r, socket_index=0, label="R * T")
         return chain.step('ADD', props.o, socket_index=0, label="+ O")
