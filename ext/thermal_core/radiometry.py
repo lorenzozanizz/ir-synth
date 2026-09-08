@@ -186,6 +186,72 @@ class RBFOTransferSpec(TransferSpec):
         return self.b / np.log(self.r / above_offset + self.f)
 
 
+@dataclass(frozen=True)
+class WienTransferSpec(TransferSpec):
+    """ Wien approximation of Planck's law, narrow-band, single centre
+    wavelength (same assumption as RBFOTransferSpec):
+
+        S(T) = R * exp(-B / T) + O
+
+    Valid where exp(B/T) >> 1, i.e. small lambda_c * T. Diverges from the
+    exact narrow-band form (RBFO with F=0) as T grows.
+
+    :param r: scaling coefficient, absorbing the physical constants, the band
+        width and the detector gain.
+    :param b: exponential coefficient in Kelvin, h*c / (lambda_c * k).
+    :param o: additive detector offset (dark signal).
+    """
+    r: float
+    b: float
+    o: float
+
+    @property
+    def transfer_type(self) -> TransferType:
+        return TransferType.WIEN
+
+    @staticmethod
+    def from_center_wavelength(
+        center_wavelength_m: float, r: float = 1.0, o: float = 0.0,
+    ) -> "WienTransferSpec":
+        """ Build a spec deriving b from a band centre wavelength rather than
+        stating it directly.
+
+        :param center_wavelength_m: band centre in metres (10micrometers -> 1e-5).
+        :param r: scaling coefficient, see class docstring.
+        :param o: detector offset, see class docstring.
+        """
+        if center_wavelength_m <= 0.0:
+            raise ValueError(
+                f"center_wavelength_m must be positive, got {center_wavelength_m}"
+            )
+        return WienTransferSpec(
+            r=r, b=SECOND_RADIATION_CONSTANT_MK / center_wavelength_m, o=o,
+        )
+
+    def validate(self) -> None:
+        """ Simple validation steps on the parameters """
+        if self.b <= 0.0:
+            raise ValueError(f"WienTransferSpec.b ({self.b}) must be positive.")
+        if self.r == 0.0:
+            raise ValueError("WienTransferSpec.r is 0, which nullifies all thermal contrast.")
+
+    def invert(self, signal: np.ndarray) -> np.ndarray:
+        """ T = B / ln(R / (S - O)).
+
+        :raises ValueError: signal contains values at or below the offset O,
+            which are unreachable outputs of this spec and so have no
+            corresponding temperature.
+        """
+        signal = np.asarray(signal, dtype=np.float64)
+        above_offset = signal - self.o
+        if np.any(above_offset <= 0.0):
+            raise ValueError(
+                "Signal values at or below the offset O are not in the range "
+                "of this transfer and cannot be inverted."
+            )
+        return self.b / np.log(self.r / above_offset)
+
+
 # Type hint
 # A function evaluating one resolved TransferSpec into a signal array of the
 # same shape as the Kelvin array handed to it.
@@ -295,3 +361,12 @@ def _evaluate_rbfo(spec: RBFOTransferSpec, temperatures_k: np.ndarray) -> np.nda
     # NaN that would otherwise propagate into. For this reason we select the
     # finite vertices and instead use the default value "o"
     return np.where(np.isfinite(signal), signal, spec.o)
+
+
+@TransferRegistry.register(WienTransferSpec)
+def _evaluate_wien(spec: WienTransferSpec, temperatures_k: np.ndarray) -> np.ndarray:
+    """ S = R * exp(-B/T) + O, evaluated elementwise.
+
+    exp(-B/T) is bounded in [0, 1) for any T > 0, no overflow guard is not needed here.
+    """
+    return spec.r * np.exp(-spec.b / temperatures_k) + spec.o

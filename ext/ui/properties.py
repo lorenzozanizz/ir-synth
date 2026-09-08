@@ -25,7 +25,7 @@ from ..thermal_core.contracts import (
     InitType, SpecScope, ShadingType, TransferType, TerminalMode, EnvironmentSpecType,
 )
 from ..thermal_core.temperature import TempUnit, Conversions
-from ..shaders.properties import RBFOTransferProperties
+from ..shaders.properties import RBFOTransferProperties, WienTransferProperties
 from ..registration import PropertyRegistration
 
 
@@ -243,6 +243,7 @@ class ThermalRenderSettings(PropertyGroup):
         default=TransferType.RBFO.name,
     )
     rbfo: PointerProperty(type=RBFOTransferProperties)                  # type: ignore
+    wien: PointerProperty(type=WienTransferProperties)                  # type: ignore
 
     emissivity: FloatProperty(                                          # type: ignore
         name="Emissivity",
