@@ -37,3 +37,42 @@ class RBFOTransferProperties(PropertyGroup):
         description="Additive detector offset",
         default=0.0,
     )
+
+
+class WienTransferProperties(PropertyGroup):
+    """ UI state for TransferType.WIEN: S = R * exp(-B/T) + O.
+    """
+    r: FloatProperty(                                                   # type: ignore
+        name="R",
+        description="Scaling coefficient, absorbing the physical constants, "
+                    "band width and detector gain",
+        default=120.0,
+    )
+    b: FloatProperty(                                                   # type: ignore
+        name="B",
+        description="Exponential coefficient in Kelvin, h*c/(lambda_c*k). "
+                    "Around 1439 for a 10um band centre",
+        default=1438.8,
+        min=1e-6,
+    )
+    o: FloatProperty(                                                   # type: ignore
+        name="O",
+        description="Additive detector offset",
+        default=0.0,
+    )
+
+
+class RayleighJeansTransferProperties(PropertyGroup):
+    """ UI state for TransferType.RAYLEIGH_JEANS: S = R * T + O.
+    """
+    r: FloatProperty(                                                   # type: ignore
+        name="R",
+        description="Scaling coefficient, absorbing the physical constants, "
+                    "band width and detector gain",
+        default=1.0,
+    )
+    o: FloatProperty(                                                   # type: ignore
+        name="O",
+        description="Additive detector offset",
+        default=0.0,
+    )
