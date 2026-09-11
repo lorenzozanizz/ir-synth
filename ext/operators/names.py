@@ -65,7 +65,7 @@ class Labels(Enum):
     # ( Deletes one object slot from one operation scope. )
     OP_SCOPE_OBJECT_REMOVE   = "thermal.op_scope_object_remove"
     # ( Menu listing every registered operation, grouped by category. )
-    ADD_OPERATION_MENU_      = "THERMAL_MT_add_operation"
+    ADD_OPERATION_MENU_      = "thermal.op_add_operation"
 
 
     # ------------- Names inside "thermal" (environment family) ---------------
