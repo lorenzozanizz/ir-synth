@@ -8,6 +8,8 @@ The add-on is also known by its internal identifier, bl_thermal. It works with B
 
 This site has two main documents.
 
+<iframe src="viewer/index.html" style="width: 100%; height: 500px; border: none;"></iframe>
+
 - Physics: describes how the add-on converts a surface temperature into a signal that a sensor would record. It covers the Wien approximation, the Rayleigh-Jeans approximation, the calibration model used by real long-wave infrared cameras, and the Stefan-Boltzmann law. It also covers how emissivity is applied.
 - Architecture: describes how the code is organized. It covers the separation between the pure physics code and the Blender specific code, the temperature field pipeline, and the shader construction used for rendering.
 
