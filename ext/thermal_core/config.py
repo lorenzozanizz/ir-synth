@@ -16,10 +16,24 @@ from .field import ObjectKey
 from .operations import FieldOperation
 from .specs import TempInitSpec
 
+from ..constants import *
 
 
 class ConfigError(Exception):
     """ Raised when a SceneThermalConfig is structurally invalid. Depends on the config type.  """
+
+
+class SchemaVersionError(ConfigError):
+    """ Raised when serialized data carries a schema version this build cannot
+    read.
+    """
+
+    def __init__(self, found: Any) -> None:
+        self.found = found
+        super().__init__(
+            f"Unsupported config schema version {found!r}. This build reads "
+            f"{sorted(SUPPORTED_SCHEMA_VERSIONS)} and writes {SCHEMA_VERSION}."
+        )
 
 
 
@@ -78,6 +92,7 @@ class SceneThermalConfig:
         """
         # Simply enumerate all operatiosn and initializations.
         return {
+            SCHEMA_VERSION_KEY: SCHEMA_VERSION,
             "sources": {
                 key: _tagged(spec) for key, spec in self.sources.items()
             },
@@ -88,11 +103,19 @@ class SceneThermalConfig:
     def from_dict(data: Mapping[str, Any]) -> "SceneThermalConfig":
         """ Rebuild a config produced by to_dict.
 
-        Operations are not rebuilt yet; the operation registry arrives in
-        phase 3 and will supply the class lookup.
+        Both sources and operations are rebuilt, each by looking its class up
+        from the "type" tag written alongside its parameters.
 
+        :raises SchemaVersionError: the data was written by an incompatible
+            version of this layout.
         :raises ConfigError: the data is malformed or names an unknown spec.
         """
+        # A file written before the version key existed is layout 1 by
+        # definition, so a missing key is treated as 1 rather than rejected.
+        version = data.get(SCHEMA_VERSION_KEY, SCHEMA_VERSION)
+        if version not in SUPPORTED_SCHEMA_VERSIONS:
+            raise SchemaVersionError(version)
+
         raw_sources = data.get("sources", {})
         if not isinstance(raw_sources, Mapping):
             raise ConfigError("'sources' must be a mapping of object key to spec")
@@ -102,8 +125,10 @@ class SceneThermalConfig:
             try:
                 spec_class = TempInitSpec.named(entry["type"])
                 # Construct the required type. This allows to serialize
-                # and deserialize scene configs.
-                sources[key] = spec_class(**entry.get("params", {}))
+                # and deserialize scene configs. from_params mirrors the
+                # operation path: it restores tuples that JSON flattened into
+                # lists, and tolerates a key that no longer exists.
+                sources[key] = spec_class.from_params(entry.get("params", {}))
             except (KeyError, TypeError) as error:
                 raise ConfigError(
                     f"Could not rebuild the source spec for {key!r}: {error}"

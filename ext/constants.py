@@ -28,3 +28,17 @@ DEFAULT_HEAT_PALETTE = (
     (1.0, 0.9, 0.0, 1.0),  # warm: yellow
     (0.8, 0.0, 0.0, 1.0),  # hottest: red
 )
+
+
+# Version of the dictionary layout produced by serialization schemas used for
+# hooks
+#
+# Written into every serialized config and checked on the way back in.
+SCHEMA_VERSION = 1
+
+# Versions this build can still read.
+SUPPORTED_SCHEMA_VERSIONS = frozenset({1})
+
+# The key the version is stored under.
+SCHEMA_VERSION_KEY = "schema_version"
+
