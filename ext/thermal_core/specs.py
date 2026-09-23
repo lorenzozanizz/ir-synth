@@ -5,8 +5,8 @@ temperature field is specified.
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import ClassVar, Dict, Optional, Type, Tuple, Union
+from dataclasses import dataclass, fields as dataclass_fields
+from typing import Any, ClassVar, Dict, Mapping, Optional, Type, Tuple, Union
 
 from .temperature import Conversions
 from .contracts import InitType, EnvironmentSpecType
@@ -44,6 +44,23 @@ class TempInitSpec(ABC):
                 f"{type_name!r} is not a known TempInitSpec subclass. "
                 f"Known: {sorted(TempInitSpec._SUBCLASSES)}"
             ) from None
+
+    @classmethod
+    def from_params(cls, params: Mapping[str, Any]) -> "TempInitSpec":
+        """ Rebuild an instance from the plain data produced by asdict().
+        A *missing required* parameter is an error as the constructor raises TypeError,
+        which the caller turns into a ConfigError.
+
+        :param params: field name -> value.
+        :raises TypeError: a required field is absent.
+        """
+        known = {field.name for field in dataclass_fields(cls)}
+        kwargs: Dict[str, Any] = {
+            name: (tuple(value) if isinstance(value, list) else value)
+            for name, value in params.items()
+            if name in known
+        }
+        return cls(**kwargs)
 
     @property
     @abstractmethod
@@ -121,8 +138,15 @@ class GradientTempSpec(TempInitSpec):
 
     # Since these specs are serializable, we have to be sure that we're handling
     # tuples and not random collections which cannot be easily compared with == or !=
+    #
+    # BOTH endpoints must be normalized. JSON has no tuple type, so a
+    # deserialized point arrives as a list; leaving one of the two as a list
+    # made a round-tripped spec compare unequal to the original, and made the
+    # degenerate-axis check in validate() silently pass, because a tuple never
+    # equals a list.
     def __post_init__(self):
         object.__setattr__(self, "point_a", tuple(float(v) for v in self.point_a))
+        object.__setattr__(self, "point_b", tuple(float(v) for v in self.point_b))
 
     @property
     def init_type(self) -> InitType:
