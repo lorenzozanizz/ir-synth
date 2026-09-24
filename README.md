@@ -39,6 +39,10 @@ This is a small project and contributions are obviously welcome. Whether it's a 
 
 The physical models and simulation approach draw on existing research in thermal simulation, heat transfer, and infrared rendering. The repository includes a `references.bib` file listing the papers and resources that informed this work, and it's worth checking if you want to understand the theory behind any particular piece of the pipeline. If you feel a source is missing or miscredited, please open an issue and we will gladly address it.
 
+## Hooks
+
+The module allows an external framework to alter its state through a set of standard hooks. With hooks, you can create, modify and set up entire thermal profiles from headless Blender scenes and render them. 
+
 ## Contact
 
 Questions, feedback, or just want to talk about the project, send an email or open an issue
