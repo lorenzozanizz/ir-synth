@@ -29,7 +29,7 @@ The project is meant to plug into a broader synthetic data ecosystem. There's an
 
 ## Getting started
 
-Documentation and tutorials are being built out at the GitHub Pages [project site](https://lorenzozanizz.github.io/ir-synth). Expect some rough edges, and check the docs for the most current setup instructions rather than relying on this README to stay in sync.
+Documentation and tutorials are being built out at the GitHub Pages [project site](https://lorenzozanizz.github.io/ir-synth). Expect some rough edges, and check the docs for the most current setup instructions rather than relying on this README to stay in sync. Currently, development of the rendering system is underway. 
 
 ## Contributing
 
@@ -45,4 +45,4 @@ The module allows an external framework to alter its state through a set of stan
 
 ## Contact
 
-Questions, feedback, or just want to talk about the project, send an email or open an issue
+Questions, feedback, or just want to talk about the project, send an email or open an issue. 
