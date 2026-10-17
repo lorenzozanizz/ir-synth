@@ -36,17 +36,9 @@ class InitType(Enum):
     @staticmethod
     def allowed_for_scope(scope: SpecScope) -> tuple:
         """ Return the subset of strategies that are legal at the given scope. """
-        if scope is SpecScope.OBJECT:
-            return _ALL_INITIALIZATION_STRATEGIES
-        if scope is SpecScope.COLLECTION:
-            return tuple(m for m in _ALL_INITIALIZATION_STRATEGIES if m not in _OBJECT_ONLY_STRATS)
-        if scope is SpecScope.SCENE:
-            # Nothing sits above the scene, so INHERIT is not allowed.
-            return tuple(
-                m for m in _ALL_INITIALIZATION_STRATEGIES
-                if m not in _OBJECT_ONLY_STRATS and m is not InitType.INHERIT
-            )
-        raise ValueError(f"Unknown scope: {scope}")
+        return _allowed_for_scope(
+            _ALL_INITIALIZATION_STRATEGIES, _OBJECT_ONLY_STRATS, InitType.INHERIT, scope,
+        )
 
 
 # These have to be put at the module level as any variable inside an Enum is still treated
@@ -54,6 +46,48 @@ class InitType(Enum):
 # Strategies that require per-object data and cannot be a Collection-level default.
 _ALL_INITIALIZATION_STRATEGIES = tuple(i_t for i_t in InitType)
 _OBJECT_ONLY_STRATS = frozenset({InitType.WEIGHT_PAINTED})
+
+
+def _allowed_for_scope(members: tuple, object_only: frozenset, inherit: Enum,
+                       scope: SpecScope) -> tuple:
+    """ The scope filter shared by every strategy enum (InitType, EmissivityType).
+
+    :param members: every member of the enum, INHERIT included.
+    :param object_only: members that need per-object data (a vertex group),
+        so a Collection or the Scene cannot offer them.
+    :param inherit: the INHERIT member of the enum.
+    :param scope: the scope to filter for.
+    """
+    if scope is SpecScope.OBJECT:
+        return tuple(members)
+    if scope is SpecScope.COLLECTION:
+        return tuple(m for m in members if m not in object_only)
+    if scope is SpecScope.SCENE:
+        return tuple(m for m in members if m not in object_only and m is not inherit)
+    raise ValueError(f"Unknown scope: {scope}")
+
+
+class EmissivityType(Enum):
+    """ Strategy used to give an object its per-vertex emissivity map.
+
+    Parallel to InitType. The scene default is a scalar value used as default.
+    """
+    # Keep this as the first attribute: it is the default of the dropdown.
+    INHERIT = "Inherit"
+
+    UNIFORM = "Uniform"
+    WEIGHT_PAINTED = "Weight Painted"
+
+    @staticmethod
+    def allowed_for_scope(scope: SpecScope) -> tuple:
+        """ Return the subset of strategies that are legal at the given scope. """
+        return _allowed_for_scope(
+            _ALL_EMISSIVITY_STRATEGIES, _OBJECT_ONLY_EMISSIVITY, EmissivityType.INHERIT, scope,
+        )
+
+
+_ALL_EMISSIVITY_STRATEGIES = tuple(e_t for e_t in EmissivityType)
+_OBJECT_ONLY_EMISSIVITY = frozenset({EmissivityType.WEIGHT_PAINTED})
 
 
 class EnvironmentSpecType(Enum):

@@ -13,7 +13,7 @@ import numpy as np
 from bpy.types import Operator, Object, Material
 
 from .names import Labels
-from ..constants import TEMPERATURE_ATTR_NAME, TEMPERATURE_MATERIAL_NAME
+from ..constants import EMISSIVITY_ATTR_NAME, TEMPERATURE_ATTR_NAME, TEMPERATURE_MATERIAL_NAME
 from ..thermal_core.contracts import ShadingType
 from ..thermal_core.temperature import Conversions, TempUnit
 from ..shaders.registry import ShaderRegistry
@@ -57,13 +57,30 @@ class VisualizeTemperatureOperator(Operator):
         for obj in objects_iter:
             VisualizeTemperatureOperator._assign_material(obj, material)
 
-
-        self.report(
-            {'INFO'},
+        message = (
             f"Built '{shading_type.value}' on {len(objects_iter)} object(s). Switch "
             f"viewport shading to Material Preview or Rendered to see it."
         )
+        # A missing emissivity map reads as 0.0 in the shader since the object
+        # shows only the reflected environment. Paths without transfer
+        # dont read emissivity.
+        missing = VisualizeTemperatureOperator._without_emissivity(objects_iter)
+        if missing and shading_type.uses_transfer():
+            names = ", ".join(repr(obj.name) for obj in missing[:5])
+            more = f" and {len(missing) - 5} more" if len(missing) > 5 else ""
+            self.report(
+                {'WARNING'},
+                f"{message} {len(missing)} object(s) have no emissivity map and "
+                f"render as perfect mirrors ({names}{more}). Bake again.",
+            )
+        else:
+            self.report({'INFO'}, message)
         return {'FINISHED'}
+
+    @staticmethod
+    def _without_emissivity(objects: List[Object]) -> List[Object]:
+        """ The objects that have no baked emissivity map. """
+        return [obj for obj in objects if obj.data.attributes.get(EMISSIVITY_ATTR_NAME) is None]
 
     @staticmethod
     def _read_temperature_values(obj: Object) -> Optional[np.ndarray]:

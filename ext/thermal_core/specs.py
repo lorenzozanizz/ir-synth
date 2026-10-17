@@ -1,52 +1,64 @@
 """
-Pure data contracts describing how an object's/collection's initial
-temperature field is specified.
+Pure data contracts describing how an object's/collection's per-vertex
+quantities are specified: the initial temperature field (TempInitSpec) and
+the emissivity map (EmissivitySpec).
 
 """
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, fields as dataclass_fields
+import math
 from typing import Any, ClassVar, Dict, Mapping, Optional, Type, Tuple, Union
 
 from .temperature import Conversions
-from .contracts import InitType, EnvironmentSpecType
+from .contracts import InitType, EmissivityType, EnvironmentSpecType
 
 
 @dataclass(frozen=True)
-class TempInitSpec(ABC):
-    """ Base class for a single temperature-initialization strategy.
+class SpecBase(ABC):
+    """ Shared base of every serializable spec family (TempInitSpec,
+    EmissivitySpec).
 
-    Concrete subclasses correspond 1:1 with an `ObjectTempInitType` member
-    (excluding INHERIT, which is a resolution-time concept, not a spec - by
-    the time a TempInitSpec exists, inheritance has already been resolved to
-    a concrete strategy).
+    Holds only what every family needs: a lookup of concrete classes by
+    name for deserialization, and the validate/get_vertex_group defaults.
     """
 
-    # Every concrete subclass, keyed by class name. Populated automatically on
-    # subclass definition and used by SceneThermalConfig to rebuild a spec from
-    # a serialized dict.
-    _SUBCLASSES: ClassVar[Dict[str, Type["TempInitSpec"]]] = {}
+    # Every subclass, keyed by class name. Populated automatically on subclass
+    # definition and used by the scene configs to rebuild a spec from a
+    # serialized dict. Class names must be unique across families.
+    _SUBCLASSES: ClassVar[Dict[str, Type["SpecBase"]]] = {}
 
     def __init_subclass__(cls, **kwargs) -> None:
         super().__init_subclass__(**kwargs)
-        TempInitSpec._SUBCLASSES[cls.__name__] = cls
+        SpecBase._SUBCLASSES[cls.__name__] = cls
 
-    @staticmethod
-    def named(type_name: str) -> Type["TempInitSpec"]:
-        """ Look up a concrete spec class by its class name.
+    @classmethod
+    def _concrete_subclasses(cls) -> Dict[str, Type["SpecBase"]]:
+        """ Concrete (non-abstract) classes of this family only. """
+        return {
+            name: found for name, found in SpecBase._SUBCLASSES.items()
+            if issubclass(found, cls) and not getattr(found, "__abstractmethods__", None)
+        }
 
-        :raises KeyError: no spec class of that name is defined.
+    @classmethod
+    def named(cls, type_name: str) -> Type["SpecBase"]:
+        """ Look up a concrete spec class of this family by its class name.
+
+        TempInitSpec.named never returns an EmissivitySpec, and the reverse.
+
+        :raises KeyError: no concrete class of that name in this family.
         """
+        family = cls._concrete_subclasses()
         try:
-            return TempInitSpec._SUBCLASSES[type_name]
+            return family[type_name]
         except KeyError:
             raise KeyError(
-                f"{type_name!r} is not a known TempInitSpec subclass. "
-                f"Known: {sorted(TempInitSpec._SUBCLASSES)}"
+                f"{type_name!r} is not a known {cls.__name__} subclass. "
+                f"Known: {sorted(family)}"
             ) from None
 
     @classmethod
-    def from_params(cls, params: Mapping[str, Any]) -> "TempInitSpec":
+    def from_params(cls, params: Mapping[str, Any]) -> "SpecBase":
         """ Rebuild an instance from the plain data produced by asdict().
         A *missing required* parameter is an error as the constructor raises TypeError,
         which the caller turns into a ConfigError.
@@ -63,7 +75,8 @@ class TempInitSpec(ABC):
         return cls(**kwargs)
 
     @property
-    @abstractmethod
+    # Dont make this abstract, not needed anymore
+    # @abstractmethod
     def init_type(self) -> InitType:
         """ The ObjectTempInitType this spec implements. """
         raise NotImplementedError
@@ -79,6 +92,23 @@ class TempInitSpec(ABC):
         """ Returns true if the initialization strategy requires some kind of
         vertex weighing, which will be extracted from the returned value """
         return None
+
+
+@dataclass(frozen=True)
+class TempInitSpec(SpecBase, ABC):
+    """ Base class for a single temperature-initialization strategy.
+
+    Concrete subclasses correspond 1:1 with an `ObjectTempInitType` member
+    (excluding INHERIT, which is a resolution-time concept, not a spec - by
+    the time a TempInitSpec exists, inheritance has already been resolved to
+    a concrete strategy).
+    """
+
+    @property
+    @abstractmethod
+    def init_type(self) -> InitType:
+        """ The ObjectTempInitType this spec implements. """
+        raise NotImplementedError
 
 
 @dataclass(frozen=True)
@@ -242,6 +272,71 @@ class ThermalProfile:
     evolution strategy will be added once thermal_core/evolution.py is built out.
     """
     init_spec: TempInitSpec
+
+
+def _is_valid_emissivity(value: float) -> bool:
+    """ Emissivity is a fraction of blackbody emission: finite, in [0, 1]. """
+    return math.isfinite(value) and 0.0 <= value <= 1.0
+
+
+@dataclass(frozen=True)
+class EmissivitySpec(SpecBase, ABC):
+    """ Base class for a single emissivity strategy.
+
+    Concrete subclasses correspond 1:1 with an EmissivityType member
+    (excluding INHERIT, which is resolved before a spec exists).
+    """
+
+    @property
+    @abstractmethod
+    def emissivity_type(self) -> EmissivityType:
+        """ The EmissivityType this spec implements. """
+        raise NotImplementedError
+
+
+@dataclass(frozen=True)
+class UniformEmissivitySpec(EmissivitySpec):
+    """ Every point on the object has the same emissivity. Also the spec
+    that the scene default emissivity resolves to. """
+    value: float
+
+    @property
+    def emissivity_type(self) -> EmissivityType:
+        return EmissivityType.UNIFORM
+
+    def validate(self) -> None:
+        if not _is_valid_emissivity(self.value):
+            raise ValueError(f"UniformEmissivitySpec.value ({self.value}) must be in [0, 1]")
+
+
+@dataclass(frozen=True)
+class WeightPaintedEmissivitySpec(EmissivitySpec):
+    """ Emissivity is derived by remapping a vertex group's per-vertex
+    weight (0-1) onto [min_value, max_value].
+    """
+    vertex_group: str
+    min_value: float
+    max_value: float
+    falloff: str = "LINEAR"
+
+    @property
+    def emissivity_type(self) -> EmissivityType:
+        return EmissivityType.WEIGHT_PAINTED
+
+    def validate(self) -> None:
+        if not self.vertex_group:
+            raise ValueError("WeightPaintedEmissivitySpec.vertex_group must not be empty")
+        if not (_is_valid_emissivity(self.min_value) and _is_valid_emissivity(self.max_value)):
+            raise ValueError("WeightPaintedEmissivitySpec extrema must be in [0, 1]")
+        if self.min_value > self.max_value:
+            raise ValueError(
+                f"WeightPaintedEmissivitySpec.min_value ({self.min_value}) must be "
+                f"<= max_value ({self.max_value})"
+            )
+
+    def get_vertex_group(self) -> str:
+        """ This strategy requires weights. """
+        return self.vertex_group
 
 
 class ThermalSpecs:

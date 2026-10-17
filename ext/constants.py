@@ -2,6 +2,8 @@
 are shared among components in the entire project.
 """
 
+from dataclasses import dataclass
+
 MAIN_PANEL_NAME = "Thermography"
 VERSION = "0.9.0"
 TARGET_VERSION = "4.5.0"
@@ -15,6 +17,31 @@ DOCU_URL = "https://github.com/lorenzozanizz/bl-thermal"
 TEMPERATURE_ATTR_NAME = "thermal_temperature_k"
 TEMPERATURE_ATTR_TYPE = 'FLOAT'
 TEMPERATURE_ATTR_DOMAIN = 'POINT'
+
+
+@dataclass(frozen=True)
+class MeshAttribute:
+    """ The name, data type and domain of one per-vertex mesh attribute that
+    the bake writes and the shaders read.
+    """
+    # attribute name on the mesh
+    name: str
+    # Blender attribute data type
+    data_type: str = 'FLOAT'
+    # Blender attribute domain
+    domain: str = 'POINT'
+
+
+# ( The per-vertex temperature field, in Kelvin )
+TEMPERATURE_ATTR = MeshAttribute(
+    TEMPERATURE_ATTR_NAME, TEMPERATURE_ATTR_TYPE, TEMPERATURE_ATTR_DOMAIN,
+)
+
+# ( The per-vertex emissivity map, a value in [0, 1]. Every baked mesh must
+#   have it: a shader Attribute node reads a missing attribute as 0.0, which
+#   is a perfect mirror and not a safe default )
+EMISSIVITY_ATTR_NAME = "thermal_emissivity"
+EMISSIVITY_ATTR = MeshAttribute(EMISSIVITY_ATTR_NAME)
 
 # ------------- Temperature visualization material ---------------
 # |

@@ -11,14 +11,16 @@ from bpy.types import Panel, Context, ID, Object, Collection
 from ..operators.names import Labels
 from ..constants import *
 from ..thermal_core.contracts import (
-    InitType, SpecScope, ShadingType, TransferType, TerminalMode, EnvironmentSpecType,
+    SpecScope, ShadingType, TransferType, TerminalMode, EnvironmentSpecType,
 )
 from ..shaders.registry import ShaderRegistry
 from ..shaders.transfer import TransferNodeRegistry
-from .init_registry import InitStrategyRegistry
 from .text_wrap_utils import WrapWidget
 from .environment_registry import EnvironmentFactorRegistry
-from .resolution import ConfigBuilder, SpecsResolver, SpecResolutionError
+from .resolution import (
+    ConfigBuilder, SpecsResolver, SpecResolutionError, SpecChannel,
+    TEMPERATURE_CHANNEL, EMISSIVITY_CHANNEL,
+)
 from .color_bar_gpu import left_bottom_color_bar
 
 
@@ -65,49 +67,55 @@ class BakeSection(UISection):
             )
 
         layout.operator(
-            Labels.BAKE_TEMPERATURE.value,
-            text="Bake Initial Temperature",
+            Labels.FULL_BAKE.value,
+            text="Bake Temperature and Emissivity",
             icon='RENDER_STILL',
         )
 
 
 class SpecSection(UISection):
-    """ Draws the temperature-init strategy dropdown and the active
-    strategy's parameters for a single scoped target.
+    """ Draws the strategy dropdown and the active strategy's parameters for
+    a single scoped target, for one channel (temperature or emissivity).
 
-    A single class serves both Object and Collection scope (rather than two
-    near-duplicate classes) - `scope` and `get_target` are supplied at
+    A single class serves both Object and Collection scope, and both
+    channels - `scope`, `get_target` and `channel` are supplied at
     construction time by whichever Panel is using it (see MainPanel /
     CollectionSpecPanel below).
     """
 
-    def __init__(self, scope: SpecScope, get_target: Callable[[Context], Optional[ID]]):
+    def __init__(self, scope: SpecScope, get_target: Callable[[Context], Optional[ID]],
+                 channel: SpecChannel = TEMPERATURE_CHANNEL, title: Optional[str] = None):
         self._scope = scope
         self._get_target = get_target
+        self._channel = channel
+        self._title = title
 
     def draw(self, context: Context, layout) -> None:
+        if self._title:
+            layout.label(text=self._title)
+
         target = self._get_target(context)
         if target is None:
             layout.label(text=f"No active {self._scope.value.lower()}", icon='INFO')
             return
 
-        strategy_props = target.thermal_init
-        layout.prop(strategy_props, "init_type")
+        channel = self._channel
+        layout.prop(channel.props_of(target), channel.type_field)
 
-        init_type = InitType[strategy_props.init_type]
+        strategy_type = channel.type_of(target)
 
-        if init_type is InitType.INHERIT:
+        if strategy_type is channel.type_enum.INHERIT:
             # Resolving what INHERIT actually evaluates to
-            layout.label(text="Inherits from collection default", icon='INFO')
+            layout.label(text="Inherits from collection or scene default", icon='INFO')
             return
 
         try:
-            descriptor = InitStrategyRegistry.get_strategy(init_type)
+            descriptor = channel.registry.get_strategy(strategy_type)
         except NotImplementedError:
-            layout.label(text=f'"{init_type.value}" is not implemented yet', icon='ERROR')
+            layout.label(text=f'"{strategy_type.value}" is not implemented yet', icon='ERROR')
             return
 
-        sub_props = getattr(strategy_props, descriptor.attr_name)
+        sub_props = getattr(channel.props_of(target), descriptor.attr_name)
         descriptor.draw(layout, sub_props)
 
 
@@ -149,7 +157,7 @@ class ShadingSection(UISection):
     """ Shading path, radiometric transfer, and the transfer's parameters.
 
     Dispatches through ShaderRegistry and TransferNodeRegistry the same way
-    SpecSection dispatches through InitStrategyRegistry, so an unimplemented
+    SpecSection dispatches through its channel's registry, so an unimplemented
     path reports itself rather than being hidden.
     """
 
@@ -205,6 +213,12 @@ class SurfaceSection(UISection):
             return
 
         layout.prop(settings, "emissivity", slider=True)
+        WrapWidget.draw(
+            layout, context,
+            "Objects and collections set to Inherit use this value. "
+            "Bake again after any change.",
+            icon='INFO',
+        )
 
         row = layout.row(align=True)
         row.prop(settings, "reflected_temperature")
@@ -309,7 +323,10 @@ class MainPanel(Panel):
 
     def draw(self, context: Context) -> None:
         panel = CentralPanel(sections=[
-            SpecSection(scope=SpecScope.OBJECT, get_target=lambda ctx: ctx.object),
+            SpecSection(scope=SpecScope.OBJECT, get_target=lambda ctx: ctx.object,
+                        channel=TEMPERATURE_CHANNEL, title="Initial Temperature"),
+            SpecSection(scope=SpecScope.OBJECT, get_target=lambda ctx: ctx.object,
+                        channel=EMISSIVITY_CHANNEL, title="Emissivity"),
         ])
         panel.draw(context, self.layout)
 
@@ -358,7 +375,8 @@ class ThermographyPanel(Panel):
 
 class CollectionSpecPanel(Panel):
     """ Properties Editor tab (shown when a Collection is the active
-    outliner ID) for setting a collection's default initial temperature.
+    outliner ID) for setting a collection's default initial temperature and
+    default emissivity.
     """
     bl_idname = "THERMAL_PT_collection_spec"
     bl_label = "Thermal"
@@ -368,7 +386,10 @@ class CollectionSpecPanel(Panel):
 
     def draw(self, context: Context) -> None:
         panel = CentralPanel(sections=[
-            SpecSection(scope=SpecScope.COLLECTION, get_target=lambda ctx: ctx.collection),
+            SpecSection(scope=SpecScope.COLLECTION, get_target=lambda ctx: ctx.collection,
+                        channel=TEMPERATURE_CHANNEL, title="Initial Temperature"),
+            SpecSection(scope=SpecScope.COLLECTION, get_target=lambda ctx: ctx.collection,
+                        channel=EMISSIVITY_CHANNEL, title="Emissivity"),
         ])
         panel.draw(context, self.layout)
 

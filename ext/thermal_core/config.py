@@ -110,11 +110,7 @@ class SceneThermalConfig:
             version of this layout.
         :raises ConfigError: the data is malformed or names an unknown spec.
         """
-        # A file written before the version key existed is layout 1 by
-        # definition, so a missing key is treated as 1 rather than rejected.
-        version = data.get(SCHEMA_VERSION_KEY, SCHEMA_VERSION)
-        if version not in SUPPORTED_SCHEMA_VERSIONS:
-            raise SchemaVersionError(version)
+        check_schema_version(data)
 
         raw_sources = data.get("sources", {})
         if not isinstance(raw_sources, Mapping):
@@ -145,6 +141,20 @@ class SceneThermalConfig:
                 ) from error
 
         return SceneThermalConfig(sources=sources, operations=tuple(operations))
+
+
+def check_schema_version(data: Mapping[str, Any]) -> None:
+    """ Reject serialized data written by an incompatible layout version.
+    Shared by every serializable scene config.
+
+    A file written before the version key existed is layout 1 by
+    definition.
+
+    :raises SchemaVersionError: the version is not supported by this build.
+    """
+    version = data.get(SCHEMA_VERSION_KEY, SCHEMA_VERSION)
+    if version not in SUPPORTED_SCHEMA_VERSIONS:
+        raise SchemaVersionError(version)
 
 
 def _tagged(item: Any) -> Dict[str, Any]:
