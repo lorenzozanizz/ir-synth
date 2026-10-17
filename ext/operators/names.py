@@ -28,7 +28,7 @@ class Labels(Enum):
     # |
     # ( Resolves each mesh object's TempInitSpec and bakes it into
     #   a per-vertex float mesh attribute. )
-    BAKE_TEMPERATURE        = "thermal.bake_temperature"
+    FULL_BAKE        = "thermal.bake_temperature"
     # ( Reserved for the future modal diffusion operator not yet implemented )
     DIFFUSE_TEMPERATURE_     = "thermal.diffuse_temperature"
     # ( Reserved for the future time-evolution operator, not yet implemented )
