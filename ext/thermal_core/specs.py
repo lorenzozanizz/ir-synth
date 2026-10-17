@@ -75,7 +75,8 @@ class SpecBase(ABC):
         return cls(**kwargs)
 
     @property
-    @abstractmethod
+    # Dont make this abstract, not needed anymore
+    # @abstractmethod
     def init_type(self) -> InitType:
         """ The ObjectTempInitType this spec implements. """
         raise NotImplementedError
