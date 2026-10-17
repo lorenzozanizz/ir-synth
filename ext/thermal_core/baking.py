@@ -1,8 +1,4 @@
-"""
-Pure numeric evaluation of a resolved TempInitSpec into a per-vertex Kelvin
-array.
-
-This is the bpy-free counterpart to ui/init_registry.py.
+""" This is the bpy-free counterpart to ui/init_registry.py.
 This registry maps a spec class to the numeric evaluate() behaviour that turns
 it into actual per-vertex values.
 
@@ -16,19 +12,20 @@ import numpy as np
 
 from .field import MeshSample
 from .specs import (
-    AmbientTempSpec, GradientTempSpec, TempInitSpec, UniformTempSpec, WeightPaintedTempSpec,
+    AmbientTempSpec, GradientTempSpec, SpecBase, UniformTempSpec, WeightPaintedTempSpec,
+    UniformEmissivitySpec, WeightPaintedEmissivitySpec,
 )
 
 
 # Typing hint
 # A function which gets evaluated for a temperature initialization
 # specification and produces the correct mesh temperature field
-EvaluateFn = Callable[[TempInitSpec, MeshSample], np.ndarray]
+EvaluateFn = Callable[[SpecBase, MeshSample], np.ndarray]
 
 
 class BakeStrategyRegistry:
-    """ Maps a TempInitSpec subclass to the pure function that evaluates it
-    into a per-vertex float64 Kelvin array.
+    """ Maps a spec subclass (TempInitSpec or EmissivitySpec) to the pure
+    function that evaluates it into a per-vertex float64 array.
 
     Adding a new strategy's numeric side means: (1) a dataclass in specs.py,
     (2) one @register(SpecType) function
@@ -36,21 +33,21 @@ class BakeStrategyRegistry:
     evaluate().
     """
 
-    _REGISTRY: Dict[Type[TempInitSpec], EvaluateFn] = {}
+    _REGISTRY: Dict[Type[SpecBase], EvaluateFn] = {}
 
     @classmethod
-    def register(cls, spec_type: Type[TempInitSpec]):
+    def register(cls, spec_type: Type[SpecBase]):
         def decorator(fn: EvaluateFn) -> EvaluateFn:
             cls._REGISTRY[spec_type] = fn
             return fn
         return decorator
 
     @classmethod
-    def evaluate(cls, spec: TempInitSpec, sample: MeshSample) -> np.ndarray:
-        """ Evaluate spec into a (sample.vertex_count,) float64 array of
-        Kelvin values.
+    def evaluate(cls, spec: SpecBase, sample: MeshSample) -> np.ndarray:
+        """ Evaluate spec into a (sample.vertex_count,) float64 array. The
+        unit depends on the spec family (Kelvin or emissivity).
 
-        :param spec: resolved, already-validated TempInitSpec (see
+        :param spec: resolved, already-validated spec (see
             ui/resolution.py:SpecsResolver.resolve_object_spec).
         :param sample: geometry extracted from bpy by the caller.
         :raises NotImplementedError: spec's type has no evaluator registered
@@ -98,6 +95,16 @@ class FalloffFunctions:
             "EASE_IN_OUT": FalloffFunctions._smoothstep,
         }.get(falloff_type, lambda t: t)
         return eval_fn(weights)
+
+
+def _remap_weights(
+    weights: np.ndarray, low: float, high: float, falloff: str,
+) -> np.ndarray:
+    """ Remap 0-1 vertex-group weights onto [low, high] through a falloff.
+    Shared by the temperature and the emissivity weight-painted strategies.
+    """
+    t = FalloffFunctions.evaluate(np.clip(weights, 0.0, 1.0), falloff)
+    return low + t * (high - low)
 
 
 @BakeStrategyRegistry.register(UniformTempSpec)
@@ -150,6 +157,29 @@ def _evaluate_weight_painted(spec: WeightPaintedTempSpec, sample: MeshSample) ->
 
     # MeshSample.validate() has already checked the length, so the only
     # remaining job is the remap itself.
-    clamped = np.clip(weights, 0.0, 1.0)
-    t = FalloffFunctions.evaluate(clamped, spec.falloff)
-    return spec.min_k + t * (spec.max_k - spec.min_k)
+    return _remap_weights(weights, spec.min_k, spec.max_k, spec.falloff)
+
+
+@BakeStrategyRegistry.register(UniformEmissivitySpec)
+def _evaluate_uniform_emissivity(spec: UniformEmissivitySpec, sample: MeshSample) -> np.ndarray:
+    """ Every vertex gets the same emissivity; no geometry is consulted. """
+    return np.full(sample.vertex_count, spec.value, dtype=np.float64)
+
+
+@BakeStrategyRegistry.register(WeightPaintedEmissivitySpec)
+def _evaluate_weight_painted_emissivity(
+    spec: WeightPaintedEmissivitySpec, sample: MeshSample,
+) -> np.ndarray:
+    """ Remaps sample.vertex_group_weights (0-1) onto
+    [spec.min_value, spec.max_value] through spec.falloff.
+
+    :raises ValueError: vertex_group_weights is missing
+    """
+    weights = sample.vertex_group_weights
+    if weights is None:
+        raise ValueError(
+            "WeightPaintedEmissivitySpec requires MeshSample.vertex_group_weights, "
+            "got None - the caller must extract the named vertex group's "
+            "weights before calling evaluate()."
+        )
+    return _remap_weights(weights, spec.min_value, spec.max_value, spec.falloff)
