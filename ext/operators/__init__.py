@@ -7,7 +7,7 @@ in this module.
 """
 
 
-from .baking import BakeTemperatureOperator
+from .baking import FullBakeOperator
 from .visualization import (VisualizeTemperatureOperator, FitDisplaySpanOperator,
                             ShowColorBarOperator, HideColorBarOperator)
 from .environment import AddEnvironmentFactorOperator, RemoveEnvironmentFactorOperator
@@ -17,7 +17,7 @@ from .stack import (AddOperationOperator, RemoveOperationOperator, MoveOperation
                     AddScopeObjectOperator, RemoveScopeObjectOperator)
 
 classes = (
-    BakeTemperatureOperator,
+    FullBakeOperator,
     VisualizeTemperatureOperator,
     FitDisplaySpanOperator,
     HideColorBarOperator,

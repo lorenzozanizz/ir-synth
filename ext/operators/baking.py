@@ -1,32 +1,21 @@
 """
-Bpy-facing orchestration for baking the scene's temperature field into a
-per-vertex float mesh attribute.
-
-The bake runs in four separate steps:
-
-    1. build a SceneThermalConfig from bpy   (ui.resolution.ConfigBuilder)
-    2. sample the geometry it refers to      (MeshSampler)
-    3. evaluate it                           (thermal_core.pipeline)
-    4. write the results back onto the meshes
-
-Only steps 1, 2 and 4 touch bpy. A hook replaces step 1 with a config of its
-own and reuses the rest unchanged.
+Bpy-facing orchestration for baking the scene's temperature field and
+emissivity map into per-vertex float mesh attributes.
 """
 
 from enum import Enum, auto
-from typing import Dict, Optional, Tuple
+from typing import Dict, Iterable, Mapping, Optional, Tuple, Union
 
 import numpy as np
 from bpy.types import Operator, Object
 
 from .names import Labels
-from ..constants import (
-    TEMPERATURE_ATTR_NAME, TEMPERATURE_ATTR_TYPE, TEMPERATURE_ATTR_DOMAIN,
-)
+from ..constants import EMISSIVITY_ATTR, TEMPERATURE_ATTR, MeshAttribute
 from ..thermal_core.config import SceneThermalConfig
-from ..thermal_core.field import FieldSet, MeshSample, ObjectKey
+from ..thermal_core.emissivity import EmissivityPipeline, SceneEmissivityConfig
+from ..thermal_core.field import MeshSample, ObjectKey
 from ..thermal_core.op_registry import OpRegistry
-from ..thermal_core.pipeline import FailureReason, PipelineResult, BakingPipeline
+from ..thermal_core.pipeline import Failure, FailureReason, BakingPipeline
 from ..ui.resolution import ConfigBuilder
 
 
@@ -51,6 +40,22 @@ _REASON_TO_OUTCOME = {
     FailureReason.MISSING_GEOMETRY: BakeOutcome.SKIPPED_MISSING_VERTEX_GROUP,
     FailureReason.OPERATION_FAILED: BakeOutcome.SKIPPED_INVALID_SPEC,
 }
+
+
+def outcomes_from_failures(failures: Iterable[Failure]) -> Dict[ObjectKey, BakeOutcome]:
+    """ Map pipeline per-object failures onto reportable outcomes. Shared by
+    the temperature and the emissivity runners.
+
+    Scene-level failures carry no key and are not attributable to one
+    object, so they are dropped here and surfaced by the summary instead.
+    """
+    return {
+        failure.key: _REASON_TO_OUTCOME.get(failure.reason, BakeOutcome.SKIPPED_INVALID_SPEC)
+        for failure in failures if failure.key is not None
+    }
+
+# Either scene config: both expose `sources` (object key -> resolved spec).
+AnyConfig = Union[SceneThermalConfig, SceneEmissivityConfig]
 
 
 class MeshSampler:
@@ -124,7 +129,7 @@ class MeshSampler:
 
     @staticmethod
     def sample_for_config(
-        objects: Dict[ObjectKey, Object], config: SceneThermalConfig,
+        objects: Dict[ObjectKey, Object], config: AnyConfig,
     ) -> Tuple[Dict[ObjectKey, MeshSample], Dict[ObjectKey, BakeOutcome]]:
         """ Sample every object the config names.
 
@@ -151,33 +156,33 @@ class MeshSampler:
 
 
 class AttributeWriter:
-    """ Writes evaluated fields back onto their meshes. """
+    """ Writes evaluated per-vertex values back onto their meshes. """
 
     @staticmethod
-    def write_one(obj: Object, values: np.ndarray) -> None:
-        """ Writes values (aligned to obj.data.vertices) into the
-        TEMPERATURE_ATTR_NAME point-domain float attribute, creating it if
-        absent. Re-baking is idempotent; a name collision with a wrong-typed
-        attribute is an error.
+    def write_one(obj: Object, values: np.ndarray,
+                  attribute_spec: MeshAttribute = TEMPERATURE_ATTR) -> None:
+        """ Writes values (aligned to obj.data.vertices) into the attribute
+        described by attribute_spec, creating it if absent. Re-baking is
+        idempotent; a name collision with a wrong-typed attribute is an error.
         """
         mesh = obj.data
-        attribute = mesh.attributes.get(TEMPERATURE_ATTR_NAME)
+        attribute = mesh.attributes.get(attribute_spec.name)
         if (attribute is not None and (
-                attribute.data_type != TEMPERATURE_ATTR_TYPE
-                or attribute.domain != TEMPERATURE_ATTR_DOMAIN)):
+                attribute.data_type != attribute_spec.data_type
+                or attribute.domain != attribute_spec.domain)):
             raise RuntimeError(
                 f"{obj.name!r} already has an attribute named "
-                f"{TEMPERATURE_ATTR_NAME!r} of type {attribute.data_type!r} on the "
-                f"{attribute.domain!r} domain, but the temperature field needs "
-                f"{TEMPERATURE_ATTR_TYPE!r} on {TEMPERATURE_ATTR_DOMAIN!r}. "
+                f"{attribute_spec.name!r} of type {attribute.data_type!r} on the "
+                f"{attribute.domain!r} domain, but the bake needs "
+                f"{attribute_spec.data_type!r} on {attribute_spec.domain!r}. "
                 f"Rename or remove the conflicting attribute."
             )
         if attribute is None:
             # If the attribute does not exist yet, create it, otherwise just set it.
             attribute = mesh.attributes.new(
-                name=TEMPERATURE_ATTR_NAME,
-                type=TEMPERATURE_ATTR_TYPE,
-                domain=TEMPERATURE_ATTR_DOMAIN,
+                name=attribute_spec.name,
+                type=attribute_spec.data_type,
+                domain=attribute_spec.domain,
             )
         # The core computes in float64 which we convert to fp32, where the
         # values stop being numbers and become mesh data.
@@ -186,21 +191,24 @@ class AttributeWriter:
 
     @staticmethod
     def write_all(
-        objects: Dict[ObjectKey, Object], fields: FieldSet,
+        objects: Dict[ObjectKey, Object],
+        values_by_key: Mapping[ObjectKey, np.ndarray],
+        attribute_spec: MeshAttribute = TEMPERATURE_ATTR,
     ) -> Dict[ObjectKey, BakeOutcome]:
-        """ Write every field in the set. One failed write does not stop the rest.
-        The object key is only used to index into the outcome dictionary.
+        """ Write every array in the mapping. One failed write does not stop
+        the rest. The object key is only used to index into the outcome
+        dictionary.
 
         :return: object key -> outcome, for every key attempted.
         """
         outcomes: Dict[ObjectKey, BakeOutcome] = {}
-        for key, field in fields.items():
+        for key, values in values_by_key.items():
             obj = objects.get(key)
             if obj is None:
                 outcomes[key] = BakeOutcome.SKIPPED_UNRESOLVED
                 continue
             try:
-                AttributeWriter.write_one(obj, field.values)
+                AttributeWriter.write_one(obj, values, attribute_spec)
                 outcomes[key] = BakeOutcome.BAKED
             except RuntimeError:
                 outcomes[key] = BakeOutcome.SKIPPED_WRITE_FAILED
@@ -241,51 +249,85 @@ class SceneBakeRunner:
             apply_operation=OpRegistry.apply,
             collections=ConfigBuilder.collection_membership(objects.values()),
         )
-        outcomes.update(SceneBakeRunner._outcomes_from_failures(result))
+        outcomes.update(outcomes_from_failures(result.failures))
 
         # 4. back onto the meshes
-        outcomes.update(AttributeWriter.write_all(objects, result.fields))
+        values = {key: field.values for key, field in result.fields.items()}
+        outcomes.update(AttributeWriter.write_all(objects, values, TEMPERATURE_ATTR))
         return outcomes
 
-    @staticmethod
-    def _outcomes_from_failures(result: PipelineResult) -> Dict[ObjectKey, BakeOutcome]:
-        """ Map the pipeline's per-object failures onto reportable outcomes.
 
-        Scene-level failures carry no key and are not attributable to one
-        object, so they are dropped here and surfaced by the summary instead.
+class EmissivityBakeRunner:
+    """ The same four steps as SceneBakeRunner, for the emissivity map.
+
+    Every mesh object resolves (the scene default closes the chain), so an
+    object fails here only for an invalid spec, a missing vertex group, or a
+    failed write.
+    """
+
+    @staticmethod
+    def run(scene) -> Dict[ObjectKey, BakeOutcome]:
+        """ Bake the emissivity map of every mesh object in the scene.
+
+        :return: object key -> outcome, for every mesh object considered.
         """
-        return {
-            failure.key: _REASON_TO_OUTCOME.get(failure.reason, BakeOutcome.SKIPPED_INVALID_SPEC)
-            for failure in result.failures if failure.key is not None
+        objects = {
+            ConfigBuilder.object_key(obj): obj for obj in ConfigBuilder.mesh_objects(scene)
         }
 
+        # 1. bpy -> config
+        config, unresolved, _invalid = ConfigBuilder.emissivity_from_scene(scene)
+        outcomes: Dict[ObjectKey, BakeOutcome] = {
+            key: BakeOutcome.SKIPPED_UNRESOLVED for key in unresolved
+        }
+        # 2. bpy -> geometry. Sampled again, apart from the temperature
+        # bake, because the two maps can read different vertex groups.
+        samples, sample_failures = MeshSampler.sample_for_config(objects, config)
+        outcomes.update(sample_failures)
 
-class BakeTemperatureOperator(Operator):
-    """ Resolves every mesh object in the scene's effective temperature-init
-    spec and bakes it into a per-vertex TEMPERATURE_ATTR_NAME float attribute
-    (see constants.py).
+        # 3. pure evaluation. Invalid specs fail here and are reported.
+        maps, failures = EmissivityPipeline.evaluate(config, samples)
+        outcomes.update(outcomes_from_failures(failures))
+
+        # 4. back onto the meshes
+        outcomes.update(AttributeWriter.write_all(objects, maps, EMISSIVITY_ATTR))
+        return outcomes
+
+
+class FullBakeOperator(Operator):
+    """ Resolves every mesh object's effective temperature-init spec and
+    emissivity spec, and bakes them into the per-vertex TEMPERATURE_ATTR and
+    EMISSIVITY_ATTR float attributes (see constants.py).
+
+    One button bakes both maps, so the two attributes cannot go out of sync.
 
     Objects that fail to resolve, use a not-yet-implemented strategy or
     reference a missing vertex group are skipped rather than blocking the
     entire scene bake.
     """
-    bl_idname = Labels.BAKE_TEMPERATURE.value
-    bl_label = "Bake Initial Temperature"
+    bl_idname = Labels.FULL_BAKE.value
+    bl_label = "Bake Temperature and Emissivity"
     bl_description = (
-        "Resolve and bake every mesh object's initial-temperature spec "
-        "into a per-vertex mesh attribute for shading"
+        "Resolve and bake every mesh object's initial-temperature and "
+        "emissivity specs into per-vertex mesh attributes for shading"
     )
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        outcomes = SceneBakeRunner.run(context.scene)
+        temperature = SceneBakeRunner.run(context.scene)
+        emissivity = EmissivityBakeRunner.run(context.scene)
 
         # Report if any baking has failed (this can happen for multiple reasons, see any
         # BakeOutcome != BAKED)
-        any_baked = any(outcome is BakeOutcome.BAKED for outcome in outcomes.values())
-        any_skipped = any(outcome is not BakeOutcome.BAKED for outcome in outcomes.values())
+        every_outcome = list(temperature.values()) + list(emissivity.values())
+        any_baked = any(outcome is BakeOutcome.BAKED for outcome in every_outcome)
+        any_skipped = any(outcome is not BakeOutcome.BAKED for outcome in every_outcome)
 
-        self.report({'WARNING'} if any_skipped else {'INFO'}, self.make_summary(outcomes))
+        summary = (
+            f"Temperature: {self.make_summary(temperature)}. "
+            f"Emissivity: {self.make_summary(emissivity)}"
+        )
+        self.report({'WARNING'} if any_skipped else {'INFO'}, summary)
 
         return {'FINISHED'} if any_baked or not any_skipped else {'CANCELLED'}
 

@@ -12,21 +12,21 @@ from typing import Tuple, Type
 
 from bpy.types import NodeSocket, PropertyGroup, ShaderNodeTree
 
+from ..constants import EMISSIVITY_ATTR_NAME
 from .nodes import TreeUtils, MathCompositor
 from .transfer import TransferDescriptor
 
 
 def build_emissivity_socket(
-    tree: ShaderNodeTree, settings: PropertyGroup, location: Tuple[float, float],
+    tree: ShaderNodeTree, location: Tuple[float, float],
 ) -> NodeSocket:
-    """ Return the socket supplying emissivity.
+    """ Return the socket supplying the per-vertex emissivity.
 
-    The seam for making emissivity spatially changing making it per-object means returning an
-    Attribute node here instead with nothing else in the pipeline changing.
-
-    :param settings: the scene's ThermalRenderSettings.
+    An Attribute node reading the baked emissivity map. A mesh without the
+    attribute reads 0.0 here (a perfect mirror), so every rendered object
+    must be baked; VisualizeTemperatureOperator warns when one is not.
     """
-    return TreeUtils.new_value(tree, settings.emissivity, location, label="Emissivity")
+    return TreeUtils.new_attribute(tree, EMISSIVITY_ATTR_NAME, location)
 
 
 def build_emissivity_mix(
@@ -94,9 +94,7 @@ def build_apparent_signal(
         tree, reflected_temperature, transfer_props, (x, y + stride_y),
     )
 
-    emissivity = build_emissivity_socket(
-        tree, settings, (x - stride_x, y + 2 * stride_y),
-    )
+    emissivity = build_emissivity_socket(tree, (x - stride_x, y + 2 * stride_y))
 
     # Place the mix past whichever branch ended furthest right, so it stays
     # correct regardless of how many nodes the transfer used.
