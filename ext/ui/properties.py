@@ -22,7 +22,8 @@ from bpy.props import (
 )
 
 from ..thermal_core.contracts import (
-    InitType, SpecScope, ShadingType, TransferType, TerminalMode, EnvironmentSpecType,
+    InitType, EmissivityType, SpecScope, ShadingType, TransferType, TerminalMode,
+    EnvironmentSpecType,
 )
 from ..thermal_core.temperature import TempUnit, Conversions
 from ..shaders.properties import RBFOTransferProperties, WienTransferProperties, RayleighJeansTransferProperties
@@ -170,6 +171,87 @@ class InitStrategyProperties(PropertyGroup):
     weight_painted: PointerProperty(type=WeightPaintedTempProperties)           # type: ignore
 
 
+# ---------------------------------------------------------------- emissivity
+#
+# Parallel to the temperature groups above. The chain is
+# Object -> Collection(s) -> ThermalRenderSettings.emissivity (scene default).
+
+_FALLOFF_ITEMS = [
+    ("LINEAR", "Linear", "Linear interpolation between min and max"),
+    ("EASE_IN_OUT", "Ease In/Out", "Smoothstep interpolation between min and max"),
+]
+
+
+class UniformEmissivityProperties(PropertyGroup):
+    """ UI state for EmissivityType.UNIFORM: one value for every point. """
+    value: FloatProperty(                                                       # type: ignore
+        name="Emissivity",
+        description="Fraction of a blackbody's emission this surface radiates",
+        default=0.95,
+        min=0.0,
+        max=1.0,
+        subtype='FACTOR',
+    )
+
+
+class WeightPaintedEmissivityProperties(PropertyGroup):
+    """ UI state for EmissivityType.WEIGHT_PAINTED. Object-only.
+    Weights (0-1) from `vertex_group` are remapped onto [min_value, max_value].
+    """
+    vertex_group: StringProperty(                                               # type: ignore
+        name="Vertex Group",
+        description="Vertex group whose weights (0-1) are remapped to an emissivity range",
+    )
+    min_value: FloatProperty(                                                   # type: ignore
+        name="Min Emissivity",
+        description="Emissivity at vertex-group weight 0.0",
+        default=0.1,
+        min=0.0, max=1.0,
+        subtype='FACTOR',
+    )
+    max_value: FloatProperty(                                                   # type: ignore
+        name="Max Emissivity",
+        description="Emissivity at vertex-group weight 1.0",
+        default=0.95,
+        min=0.0,
+        max=1.0,
+        subtype='FACTOR',
+    )
+    falloff: EnumProperty(                                                      # type: ignore
+        name="Falloff",
+        description="How intermediate weights are remapped between min and max",
+        items=_FALLOFF_ITEMS,
+        default="LINEAR",
+    )
+
+
+# Module level for the same reason as STRATEGIES_BY_SCOPE: Blender keeps no
+# reference to the items returned by a dynamic enum callback.
+EMISSIVITY_STRATEGIES_BY_SCOPE = {
+    scope: [(m.name, m.value, "") for m in EmissivityType.allowed_for_scope(scope)]
+    for scope in SpecScope
+}
+
+
+def _emissivity_type_items(self, _):
+    """ Determines scope (Object vs Collection) """
+    return EMISSIVITY_STRATEGIES_BY_SCOPE.get(_scope_for(self.id_data))
+
+
+class EmissivityStrategyProperties(PropertyGroup):
+    """ "Which emissivity strategy, and its parameters" container, attached
+    to both Object and Collection as `thermal_emissivity`. Only the sub-group
+    matching `emissivity_type` is meaningful at any given time.
+    """
+    emissivity_type: EnumProperty(                                              # type: ignore
+        name="Emissivity",
+        description="Strategy used to determine the per-vertex emissivity",
+        items=_emissivity_type_items,                                           # type: ignore
+    )
+    uniform: PointerProperty(type=UniformEmissivityProperties)                  # type: ignore
+    weight_painted: PointerProperty(type=WeightPaintedEmissivityProperties)     # type: ignore
+
+
 class EnvironmentAmbientTemperatureProperties(PropertyGroup):
     """ UI state for EnvironmentSpecType.AMBIENT_TEMPERATURE: the air
     temperature surrounding the whole scene, used for convective/radiative
@@ -246,8 +328,9 @@ class ThermalRenderSettings(PropertyGroup):
     Attached to Scene and not individual objects because most of these is a
     property of the camera or the environment, not of a single mesh.
 
-    The exception is emissivity, which is per-surface and is put here
-    only as a starting point, to be changed later in individual full-object specification.
+    The exception is emissivity, which is per-surface. The value here is the
+    scene default: the last link of the emissivity chain, used by every
+    object that resolves to INHERIT with no concrete collection value.
     """
 
     shading_type: EnumProperty(                                         # type: ignore
@@ -268,9 +351,11 @@ class ThermalRenderSettings(PropertyGroup):
     rayleigh_jeans: PointerProperty(type=RayleighJeansTransferProperties)  # type: ignore
 
     emissivity: FloatProperty(                                          # type: ignore
-        name="Emissivity",
-        description="Fraction of a blackbody's emission this surface actually "
-                    "radiates. The remainder is reflected from the environment",
+        name="Default Emissivity",
+        description="Scene default emissivity, used by every object set to "
+                    "Inherit with no collection value. Fraction of a "
+                    "blackbody's emission a surface actually radiates. The "
+                    "remainder is reflected from the environment",
         default=0.95,
         min=0.0,
         max=1.0,
@@ -336,6 +421,14 @@ data_properties = (
     ),
     PropertyRegistration(
         owner=Collection, name="thermal_init", value=PointerProperty(type=InitStrategyProperties)
+    ),
+    PropertyRegistration(
+        owner=Object, name="thermal_emissivity",
+        value=PointerProperty(type=EmissivityStrategyProperties),
+    ),
+    PropertyRegistration(
+        owner=Collection, name="thermal_emissivity",
+        value=PointerProperty(type=EmissivityStrategyProperties),
     ),
 )
 
