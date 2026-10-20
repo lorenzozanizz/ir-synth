@@ -16,7 +16,7 @@ from ..thermal_core.contracts import (
 from ..shaders.registry import ShaderRegistry
 from ..shaders.transfer import TransferNodeRegistry
 from .text_wrap_utils import WrapWidget
-from .environment_registry import EnvironmentFactorRegistry
+from .environment_registry import EnvironmentFactorRegistry, EnvSearch
 from .resolution import (
     ConfigBuilder, SpecsResolver, SpecResolutionError, SpecChannel,
     TEMPERATURE_CHANNEL, EMISSIVITY_CHANNEL,
@@ -208,7 +208,8 @@ class SurfaceSection(UISection):
 
     def draw(self, context: Context, layout) -> None:
         settings = context.scene.thermal_render
-        if not ShadingType[settings.shading_type].uses_transfer():
+        shading_type = ShadingType[settings.shading_type]
+        if not shading_type.uses_transfer():
             layout.label(text="Not used by this shading path", icon='INFO')
             return
 
@@ -220,15 +221,38 @@ class SurfaceSection(UISection):
             icon='INFO',
         )
 
-        row = layout.row(align=True)
-        row.prop(settings, "reflected_temperature")
-        row.prop(settings, "reflected_unit", text="")
+        if shading_type.traces_reflections():
+            SurfaceSection._draw_traced_reflection(settings, layout, context)
+        else:
+            row = layout.row(align=True)
+            row.prop(settings, "reflected_temperature")
+            row.prop(settings, "reflected_unit", text="")
 
         if settings.emissivity < SurfaceSection._MIRROR_THRESHOLD:
             WrapWidget.draw(
                 layout, context,
                 "Mostly reflective: the image will show the environment "
                 "more than the object.",
+                icon='INFO',
+            )
+
+    @staticmethod
+    def _draw_traced_reflection(settings, layout, context: Context) -> None:
+        """ Shape of the reflection, and where the background comes from. """
+        layout.prop(settings, "specular_fraction", slider=True)
+        layout.prop(settings, "reflection_roughness", slider=True)
+        if EnvSearch.find(EnvironmentSpecType.AMBIENT_TEMPERATURE) is None:
+            WrapWidget.draw(
+                layout, context,
+                "The background temperature comes from the Ambient Temperature "
+                "factor. Add it in Scene Properties > Thermal Environment.",
+                icon='ERROR',
+            )
+        else:
+            WrapWidget.draw(
+                layout, context,
+                "Other objects are reflected by ray tracing. Empty space "
+                "reflects the Ambient Temperature factor.",
                 icon='INFO',
             )
 
@@ -239,11 +263,20 @@ class OutputSection(UISection):
     def draw(self, context: Context, layout) -> None:
         settings = context.scene.thermal_render
         layout.prop(settings, "terminal_mode")
+        traces = ShadingType[settings.shading_type].traces_reflections()
 
         if TerminalMode[settings.terminal_mode] is TerminalMode.FALSE_COLOR:
+            if traces:
+                WrapWidget.draw(
+                    layout, context,
+                    "False colour is not available with ray-traced shading yet: "
+                    "other surfaces would reflect the palette. Use Raw Signal.",
+                    icon='ERROR',
+                )
+                return
             OutputSection._draw_span(settings, layout, context)
         else:
-            OutputSection._draw_raw_notes(context, layout)
+            OutputSection._draw_raw_notes(context, layout, traces)
 
     @staticmethod
     def _draw_span(settings, layout, context) -> None:
@@ -260,10 +293,20 @@ class OutputSection(UISection):
             WrapWidget.draw(layout, context, "Span minimum must be below its maximum.")
 
     @staticmethod
-    def _draw_raw_notes(context: Context, layout) -> None:
+    def _draw_raw_notes(context: Context, layout, traces: bool) -> None:
         WrapWidget.draw(
             layout, context, "Linear signal. Invertible back to temperature.", icon='INFO',
         )
+        # Light transport would scale the detector offset, so the ray-traced
+        # paths leave it out of the image (see shaders/ray.py).
+        if traces:
+            WrapWidget.draw(
+                layout, context,
+                "Pixels hold S - O, without the detector offset. Add O to get "
+                "the camera reading. The temperature inversion uses S - O "
+                "directly.",
+                icon='INFO',
+            )
         # AgX and Filmic tone-map the result, which destroys the measurement
         # in the viewport and in any 8-bit output.
         if context.scene.view_settings.view_transform != 'Standard':
