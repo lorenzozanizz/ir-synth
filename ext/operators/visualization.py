@@ -6,11 +6,11 @@ The shading path is resolved from the scene's ThermalRenderSettings, so this
 operator holds no knowledge of how any particular material is built.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Any
 
 import bpy
 import numpy as np
-from bpy.types import Operator, Object, Material, World
+from bpy.types import Operator, Object, Material
 
 from .names import Labels
 from ..constants import (
@@ -131,7 +131,7 @@ class VisualizeTemperatureOperator(Operator):
         apply_ray_render_settings(scene)
 
     @staticmethod
-    def _get_or_create_world(scene) -> World:
+    def _get_or_create_world(scene) -> Any:
         """ The thermal World, assigned to scene. The previous World gets a
         fake user, so Blender does not delete it on save when no other scene
         uses it.

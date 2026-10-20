@@ -10,9 +10,9 @@ The World uses the same transfer as the materials, and, like them, without the
 detector offset O: the World is a source of light transport too.
 """
 
-from typing import Tuple, Type
+from typing import Tuple, Type, Any
 
-from bpy.types import Node, PropertyGroup, World
+from bpy.types import Node, PropertyGroup
 
 from .nodes import MathCompositor, TreeUtils
 from .transfer import TransferDescriptor
@@ -21,7 +21,7 @@ _VALUE_LOCATION: Tuple[float, float] = (-1200.0, 0.0)
 
 
 def build_thermal_world(
-    world: World,
+    world: Any,
     descriptor: Type[TransferDescriptor],
     props: PropertyGroup,
     background_k: float,
