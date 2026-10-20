@@ -65,6 +65,23 @@ def build_terminal(
     tree.links.new(emission.outputs['Emission'], output.inputs['Surface'])
 
 
+def build_shader_output(
+    tree: ShaderNodeTree,
+    shader_socket: NodeSocket,
+    location: Tuple[float, float],
+) -> None:
+    """ Connect a finished shader to a new Material Output.
+
+    For the ray-traced path, which ends in a shader (emission + BSDF) and not
+    in a signal. It is always RAW: a palette inside the material would be
+    reflected by other surfaces, so false colour for that path must be applied
+    after light transport.
+    """
+    output: Node = tree.nodes.new('ShaderNodeOutputMaterial')
+    output.location = location
+    tree.links.new(shader_socket, output.inputs['Surface'])
+
+
 def _build_false_color(
     tree: ShaderNodeTree,
     signal_socket: NodeSocket,

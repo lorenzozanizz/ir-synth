@@ -49,6 +49,10 @@ EMISSIVITY_ATTR = MeshAttribute(EMISSIVITY_ATTR_NAME)
 #   and assigns to every baked object )
 TEMPERATURE_MATERIAL_NAME = "Thermal Visualization"
 
+# ( Name of the World that VisualizeTemperatureOperator builds and assigns to
+#   the scene for the ray-traced shading paths: the thermal background )
+THERMAL_WORLD_NAME = "Thermal World"
+
 DEFAULT_HEAT_PALETTE = (
     (0.0, 0.0, 0.6, 1.0),  # coldest: deep blue
     (0.0, 0.8, 0.8, 1.0),  # cool: cyan

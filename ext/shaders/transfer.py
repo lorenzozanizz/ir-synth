@@ -53,6 +53,7 @@ class TransferDescriptor(ABC):
         temperature_socket: NodeSocket,
         props: PropertyGroup,
         location: Tuple[float, float],
+        with_offset: bool = True,
     ) -> NodeSocket:
         """ Append this transfer's nodes to tree and return the socket carrying
         the resulting transformed signal (a function of a raw temperature map across the scene).
@@ -61,6 +62,11 @@ class TransferDescriptor(ABC):
         :param temperature_socket: input socket supplying Kelvin temperature map.
         :param props: parameter group for this transfer.
         :param location: top-left position for the generated chain (for visual inspection).
+        :param with_offset: add the detector offset O at the end of the chain.
+            Set False when the signal enters light transport (an Emission or
+            Background shader): S - O is linear in band radiance, so Cycles
+            may scale and sum it over bounces, but O is a detector term that
+            must be added exactly once, after the render.
         """
         pass
 
@@ -134,6 +140,7 @@ class RBFOTransfer(TransferDescriptor):
         temperature_socket: NodeSocket,
         props: RBFOTransferProperties,
         location: Tuple[float, float],
+        with_offset: bool = True,
     ) -> NodeSocket:
         chain = MathCompositor(tree, location, temperature_socket)
 
@@ -150,7 +157,9 @@ class RBFOTransfer(TransferDescriptor):
         chain.step('MAXIMUM', UNDERFLOW_GUARD, label="Guard denominator")
         # R / denominator, with R in input 0.
         chain.step('DIVIDE', props.r, socket_index=1, label="R / denom")
-        return chain.step('ADD', props.o, socket_index=0, label="+ O")
+        if with_offset:
+            chain.step('ADD', props.o, socket_index=0, label="+ O")
+        return chain.socket
 
 
 @TransferNodeRegistry.register(TransferType.WIEN)
@@ -183,6 +192,7 @@ class WienTransfer(TransferDescriptor):
         temperature_socket: NodeSocket,
         props: WienTransferProperties,
         location: Tuple[float, float],
+        with_offset: bool = True,
     ) -> NodeSocket:
         chain = MathCompositor(tree, location, temperature_socket)
 
@@ -195,7 +205,9 @@ class WienTransfer(TransferDescriptor):
         chain.step_unary('EXPONENT', label="exp")
         # R * exp(-B/T), with R in input 0.
         chain.step('MULTIPLY', props.r, socket_index=0, label="R * exp")
-        return chain.step('ADD', props.o, socket_index=0, label="+ O")
+        if with_offset:
+            chain.step('ADD', props.o, socket_index=0, label="+ O")
+        return chain.socket
 
 
 @TransferNodeRegistry.register(TransferType.RAYLEIGH_JEANS)
@@ -225,9 +237,12 @@ class RayleighJeansTransfer(TransferDescriptor):
         temperature_socket: NodeSocket,
         props: RayleighJeansTransferProperties,
         location: Tuple[float, float],
+        with_offset: bool = True,
     ) -> NodeSocket:
         chain = MathCompositor(tree, location, temperature_socket)
 
         # R * T, with R in input 0.
         chain.step('MULTIPLY', props.r, socket_index=0, label="R * T")
-        return chain.step('ADD', props.o, socket_index=0, label="+ O")
+        if with_offset:
+            chain.step('ADD', props.o, socket_index=0, label="+ O")
+        return chain.socket

@@ -374,6 +374,24 @@ class ThermalRenderSettings(PropertyGroup):
         default=TempUnit.CELSIUS.name,
     )
 
+    # Ray-traced path only: shape of the (1 - emissivity) reflection.
+    specular_fraction: FloatProperty(                                   # type: ignore
+        name="Specular Fraction",
+        description="Part of the reflection that is glossy. 0 is a fully "
+                    "diffuse reflection, 1 is a fully glossy reflection",
+        default=0.2,
+        min=0.0,
+        max=1.0,
+    )
+    reflection_roughness: FloatProperty(                                # type: ignore
+        name="Reflection Roughness",
+        description="Roughness of the glossy part of the reflection. 0 is a "
+                    "mirror",
+        default=0.3,
+        min=0.0,
+        max=1.0,
+    )
+
     terminal_mode: EnumProperty(                                        # type: ignore
         name="Output",
         description="False colour is a viewport display choice "

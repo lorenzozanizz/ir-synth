@@ -12,11 +12,12 @@ from typing import Dict, Tuple, Type
 from bpy.types import Material, PropertyGroup, ShaderNodeTree
 
 from ..constants import TEMPERATURE_ATTR_NAME
-from ..thermal_core.contracts import ShadingType, TransferType
+from ..thermal_core.contracts import ShadingType, TerminalMode, TransferType
 from ..thermal_core.radiometry import signal_span
-from .emissivity import build_apparent_signal
+from .emissivity import build_apparent_signal, build_emissivity_socket
 from .nodes import TreeUtils, MathCompositor
-from .terminal import build_terminal
+from .ray import build_reflective_surface
+from .terminal import build_shader_output, build_terminal
 from .transfer import TransferNodeRegistry
 
 class ShaderDescriptor(ABC):
@@ -135,4 +136,49 @@ class NodeShader(ShaderDescriptor):
             settings,
             signal_span(spec, settings.span_min_k(), settings.span_max_k()),
             (signal.node.location[0] + x_stride, _BODY_LOCATION[1]),
+        )
+
+
+@ShaderRegistry.register(ShadingType.RAY_NODE_SHADER)
+class RayNodeShader(ShaderDescriptor):
+    """ Surface that emits eps * S(T) and reflects with albedo 1 - eps.
+
+    Cycles' path tracer supplies the reflected emission of the other bodies
+    and of the World (see ray.py). The signal leaves the material without the
+    detector offset O, which is added once after the render.
+    """
+    shading_type = ShadingType.RAY_NODE_SHADER
+
+    @staticmethod
+    def build(material: Material, settings: PropertyGroup) -> None:
+        transfer = TransferNodeRegistry.get(TransferType[settings.transfer_type])
+        props = getattr(settings, transfer.attr_name)
+
+        spec = transfer.build_spec(props)
+        spec.validate()
+        # Check before the tree is cleared, so a refused build leaves the
+        # material as it was.
+        if TerminalMode[settings.terminal_mode] is TerminalMode.FALSE_COLOR:
+            raise ValueError(
+                f"'{TerminalMode.FALSE_COLOR.value}' is not available with "
+                f"'{ShadingType.RAY_NODE_SHADER.value}': other surfaces would "
+                f"reflect the palette. Set the output to "
+                f"'{TerminalMode.RAW.value}'."
+            )
+
+        x_stride, y_stride = MathCompositor.strides()
+        tree = _prepare_tree(material)
+        temperature = TreeUtils.new_attribute(tree, TEMPERATURE_ATTR_NAME, _ATTRIBUTE_LOCATION)
+        signal = transfer.build_nodes(
+            tree, temperature, props, _BODY_LOCATION, with_offset=False,
+        )
+        emissivity = build_emissivity_socket(
+            tree, (_ATTRIBUTE_LOCATION[0], _BODY_LOCATION[1] + y_stride),
+        )
+        surface = build_reflective_surface(
+            tree, signal, emissivity, settings,
+            (signal.node.location[0] + x_stride, _BODY_LOCATION[1]),
+        )
+        build_shader_output(
+            tree, surface, (surface.node.location[0] + x_stride, _BODY_LOCATION[1]),
         )

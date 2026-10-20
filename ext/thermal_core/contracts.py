@@ -189,6 +189,17 @@ class ShadingType(Enum):
         """
         return self is not ShadingType.TEMPERATURE_SHADER
 
+    def traces_reflections(self) -> bool:
+        """ Whether this path gets the reflected emission of other bodies from
+        light transport. Such a path needs a thermal World (the background)
+        and render settings that keep pixel values linear.
+        """
+        return self in (
+            ShadingType.RAY_NODE_SHADER,
+            ShadingType.RAY_OSL_SHADER,
+            ShadingType.MANUAL_RAY,
+        )
+
 
 class TerminalMode(Enum):
     """ What the end of a shader graph produces. """
