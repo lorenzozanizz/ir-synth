@@ -43,6 +43,10 @@ The physical models and simulation approach draw on existing research in thermal
 
 The module allows an external framework to alter its state through a set of standard hooks. With hooks, you can create, modify and set up entire thermal profiles from headless Blender scenes and render them. 
 
+## Filters
+
+New filters are being implemented which allow the rapid modification of temperatur fields, like smoothing and contact diffusion. 
+
 ## Contact
 
 Questions, feedback, or just want to talk about the project, send an email or open an issue. 
