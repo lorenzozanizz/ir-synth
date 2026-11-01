@@ -23,6 +23,8 @@ Generating a thermal image with IR-synth usually follows a simple procedure:
 
 **4. Render the thermography image.** Finally, the scene is rendered into a synthetic thermal image using one of the available renderers, giving you output that mimics what a real IR sensor would capture.
 
+![Example](./resources/frame_00015.png)
+
 ## Where this is headed
 
 The project is meant to plug into a broader synthetic data ecosystem. There's an intention to integrate with [BlenderProc](https://github.com/DLR-RM/BlenderProc) and [RenderSynth](https://github.com/lorenzozanizz/rendersynth) down the line, so that thermal generation can enter into existing procedural rendering pipelines rather than staying isolated. This isn't fully implemented yet, just the direction things are heading.
