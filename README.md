@@ -7,7 +7,7 @@
 
 IR-synth is a Blender add-on for generating synthetic thermal imagery. The goal is to make it easy to produce realistic, labeled infrared data without needing an actual thermal camera or a physical scene, which is useful for training and testing computer vision models that work with thermal images.
 
-Blender already gives the user a full 3D pipeline with geometry, materials, cameras, and rendering aspects. IR-synth adds a way to simulate heat and radiation on top of that scene, so what comes out the other end looks like it was captured by a thermal sensor instead of a regular RGB camera.
+Blender already gives the user a full 3D pipeline with geometry, materials, cameras, and rendering aspects. IR-synth adds a way to simulate heat and radiation on top of that scene, so what comes out the other end looks like it was captured by a thermal sensor.
 
 ## How it works
 
